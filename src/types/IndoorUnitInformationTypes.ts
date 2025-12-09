@@ -1,0 +1,23 @@
+export interface indoorUnitInformationTypes {
+    device_sn: string,
+    device_name: string,
+    idu_fault: string,
+    left_right_swing: number,
+    up_down_swing: number,
+    fan_speed: number,
+    is_auto_fan: number,
+    inner_board_t1: number,
+    set_temperature: number,
+    run_mode: number,
+    IduMachineMode: number,
+    heat_temp_up_lock: number,
+    cool_temp_down_lock: number,
+    idu_lock_mode: number,
+    idu_lock: number,
+    auto_lock: number,
+    wind_speed_lock: number,
+    switch_lock: number,
+    wire_control_lock: number,
+    remote_control_lock: number,
+    off_line: number
+}

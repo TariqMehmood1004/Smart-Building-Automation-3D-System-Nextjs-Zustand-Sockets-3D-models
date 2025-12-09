@@ -1,0 +1,32 @@
+# Next.js build output
+.next/
+
+# Node modules
+node_modules/
+**/node_modules/
+
+# Virtual environment
+.venv/
+__pycache__/
+.idea/
+
+# System files
+.DS_Store
+
+# Env vars
+.env
+/.env
+
+# Logs
+*.log
+
+# Database
+db.sqlite3
+
+# Vercel
+/.vercel
+phf-loan-frontend.zip
+phf-loan-frontend-23-07-2025.zip
+src/app/scheme/3/documents/page copy.tsx
+.next
+node_modules
