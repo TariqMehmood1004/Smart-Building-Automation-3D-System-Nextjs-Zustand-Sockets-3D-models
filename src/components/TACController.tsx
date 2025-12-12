@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
-import { Power, Minus, Plus, Wind, Flame, Sun, Fan, Loader, Loader2 } from 'lucide-react';
+import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
+import { Power, Minus, Plus, Wind, Flame, Sun, Fan } from 'lucide-react';
 import { Button } from '@heroui/button';
 import { useMideaStore } from '@/stores/useMideaStore';
 import { HvacMideaDevice } from "@/types/midea-types";
 import TCornerButton from './TCornerButton';
 import TCircularTemperatureDial from './TCircularTemperatureDial';
 import Image from 'next/image';
-
+import toast from 'react-hot-toast';
+import TAnimatedNumber from './TAnimatedNumbers';
+import TFanSpeedSlider from './TFanSpeedSlider';
 
 interface ACControlDrawerProps {
     data: HvacMideaDevice[] | null,
@@ -14,31 +16,50 @@ interface ACControlDrawerProps {
     onClose: () => void
 };
 
-const ACControlDrawer = ({ data, onClose, isMatchedRoom }: ACControlDrawerProps) => {
-
+const ACControlDrawer = ({ 
+    data, 
+    onClose, 
+    isMatchedRoom,
+}: ACControlDrawerProps) => {
     const {
         devicePowerOnOff,
+        updateDevice,
         isDevicePowerOnLoading,
         isMasterPowerOn,
         masterPowerOnOff,
+        data: storeData, // LIVE DATA FROM STORE
     } = useMideaStore();
 
     const device = data ? data[0] : null;
 
-    const [temperature, setTemperature] = useState(device?.set_temperature || 0);
+    // LIVE DEVICE - Always fresh from store
+    const liveDevice = useMemo(() => {
+        if (!device?.deviceSn || !storeData?.metadata) return device;
+        return storeData.metadata.find(d => d.deviceSn === device.deviceSn) || device;
+    }, [device, storeData?.metadata]);
 
+    // LIVE VALUES - Sync with store automatically
+    const temperature = liveDevice?.set_temperature || 24;
+    const runMode = liveDevice?.run_mode || 0;
+
+    // Local states for UX (don't conflict with live data)
     const [selectedMode, setSelectedMode] = useState('auto');
     const [swingThrow, setSwingThrow] = useState(true);
     const [fanSpeed, setFanSpeed] = useState(60);
+    const [isMinTempLockOn, setIsMinTempLockOn] = useState(false);
+    const [isMaxTempLockOn, setIsMaxTempLockOn] = useState(false);
+
+    const [localTemp, setLocalTemp] = useState(temperature); // For smooth dragging UX
+    const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
     const modes = [
-        { id: 'auto', label: 'Auto', icon: Wind, color: 'text-emerald-400', image: '/icons/AutoIcon.svg' },
-        { id: 'cool', label: 'Cool', icon: Wind, color: 'text-blue-400', image: '/icons/CoolIcon.svg' },
-        { id: 'heat', label: 'Heat', icon: Flame, color: 'text-orange-400', image: '/icons/HeatIcon.svg' },
-        { id: 'dry', label: 'Dry', icon: Sun, color: 'text-yellow-400', image: '/icons/DryIcon.svg' },
-        { id: 'fan', label: 'Fan', icon: Fan, color: 'text-purple-400', image: '/icons/FanIcon.svg' }
+        { id: 'auto', label: 'Auto',    mode: 192,  icon: Wind, color: 'text-emerald-400',  bg: '#27AE60', image: '/icons/AutoIcon.svg' },
+        { id: 'cool', label: 'Cool',    mode: 66,  icon: Wind,  color: 'text-blue-400',     bg: '#3498DB', image: '/icons/CoolIcon.svg' },
+        { id: 'heat', label: 'Heat',    mode: 67,  icon: Flame, color: 'text-orange-400',   bg: '#E67E22', image: '/icons/HeatIcon.svg' },
+        { id: 'dry', label: 'Dry',      mode: 70,  icon: Sun,   color: 'text-yellow-400',   bg: '#F1C40F', image: '/icons/DryIcon.svg' },
+        { id: 'fan', label: 'Fan',      mode: 65,  icon: Fan,   color: 'text-purple-400',   bg: '#8E44AD', image: '/icons/FanIcon.svg' }
     ];
-
+    
     const locks = [
         { id: 'cool-lock', label: 'Cool Lock', icon: Wind },
         { id: 'heat-lock', label: 'Heat Lock', icon: Flame },
@@ -49,52 +70,149 @@ const ACControlDrawer = ({ data, onClose, isMatchedRoom }: ACControlDrawerProps)
         { id: 'wired-control', label: 'Wired Control Lock', icon: 'wired', fullWidth: true }
     ];
 
-    const handlePowerOnOff = () => {
+    const handlePowerOnOff = useCallback(() => {
         devicePowerOnOff(device?.deviceSn || '');
-    };
+    }, [devicePowerOnOff, device?.deviceSn]);
+
+    const handleRunModesControl = useCallback((mode: number) => {
+        if (!mode) {
+            toast.error("Invalid mode option.");
+            return;
+        }
+
+        updateDevice(device?.deviceSn || '', {
+            "device_name": device?.deviceSn || '',
+            "content": [
+                {
+                "deviceType": 4,
+                "instructions": [
+                        {
+                            "command": "IduMode",
+                            "parameter": mode
+                        },
+                    ]
+                }
+            ]
+        });
+    }, [devicePowerOnOff, device?.deviceSn]);
+
+    const handleTemperatureChange = useCallback((device_sn: string, set_temperature: string) => {
+        
+        updateDevice(device_sn, {
+            "device_name": device_sn,
+            "content": [{
+                "deviceType": 4,
+                "instructions": [{
+                    "command": "SetTemperature",
+                    "parameter": parseInt(set_temperature)
+                }]
+            }]
+        });
+    }, [updateDevice]);
+
+    const handleTempDecrease = useCallback((deviceSn: string) => {
+        setLocalTemp((prev) => {
+            const newTemp = Math.max(16, prev - 1);
+
+            // if newTemp is equal to 16 then setIsMinTempLockOn to true
+            if (newTemp === 16) {
+                setIsMinTempLockOn(true);
+                setIsMaxTempLockOn(false);
+            } else {
+                setIsMinTempLockOn(false);
+                setIsMaxTempLockOn(false);
+            }
+            
+            if (debounceTimerRef.current) {
+                clearTimeout(debounceTimerRef.current);
+            }
+            
+            debounceTimerRef.current = setTimeout(() => {
+                handleTemperatureChange(deviceSn, newTemp.toString());
+            }, 500);
+            
+            return newTemp;
+        });
+    }, [handleTemperatureChange]);
+
+    const handleTempIncrease = useCallback((deviceSn: string) => {
+        setLocalTemp((prev) => {
+            const newTemp = Math.min(30, prev + 1);
+
+            // if newTemp is equal to 30 then setIsMinTempLockOn to true
+            if (newTemp === 30) {
+                setIsMaxTempLockOn(true);
+                setIsMinTempLockOn(false);
+            } else {
+                setIsMaxTempLockOn(false);
+                setIsMinTempLockOn(false);
+            }
+            
+            if (debounceTimerRef.current) {
+                clearTimeout(debounceTimerRef.current);
+            }
+            
+            debounceTimerRef.current = setTimeout(() => {
+                handleTemperatureChange(deviceSn, newTemp.toString());
+            }, 500);
+            
+            return newTemp;
+        });
+    }, [handleTemperatureChange]);
+
+    // SYNC localTemp with liveDevice when store updates (but not during dragging)
+    const [isDraggingTemp, setIsDraggingTemp] = useState(false);
+    
+    useEffect(() => {
+        if (!isDraggingTemp && Math.abs(localTemp - temperature) > 0.1) {
+            setLocalTemp(temperature);
+
+            // if temperature is at min or max, set lock accordingly
+            if (temperature <= 16) {
+                setIsMinTempLockOn(true);
+            } else if (temperature >= 30) {
+                setIsMaxTempLockOn(true);
+            } else {
+                setIsMinTempLockOn(false);
+                setIsMaxTempLockOn(false);
+            }
+        }
+    }, [temperature, isDraggingTemp]);
+
+    // Cleanup timer on unmount
+    useEffect(() => {
+        return () => {
+            if (debounceTimerRef.current) {
+                clearTimeout(debounceTimerRef.current);
+            }
+        };
+    }, []);
 
     return (
         <div className="w-full mx-auto bg-[#16161A] text-white border border-[#0D8FAC] shadow-2xl relative overflow-hidden">
-
-            {/* Cyan corners decoration */}
-            <div
-                className="w-2.5 h-2.5 bg-[#0D8FAC] absolute top-0 left-1/2 -translate-x-1/2 z-[999]"
-                style={{
-                    clipPath: 'polygon(0% 0%, 100% 0%, 50% 100%)'
-                }}
-            >
+            {/* Cyan corners decoration - unchanged */}
+            <div className="w-2.5 h-2.5 bg-[#0D8FAC] absolute top-0 left-1/2 -translate-x-1/2 z-[999]" style={{ clipPath: 'polygon(0% 0%, 100% 0%, 50% 100%)' }}>
                 <span className="w-2.5 h-2.5 bg-[#0D8FAC]"></span>
             </div>
-
             <span className="w-2.5 h-2.5 bg-[#0D8FAC] absolute top-0 left-0 z-[999]"></span>
             <span className="w-2.5 h-2.5 bg-[#0D8FAC] absolute top-0 right-0 z-[999]"></span>
             <span className="w-2.5 h-2.5 bg-[#0D8FAC] absolute bottom-0 right-0 z-[999]"></span>
             <span className="w-2.5 h-2.5 bg-[#0D8FAC] absolute bottom-0 left-0 z-[999]"></span>
-
-            <div
-                className="w-2.5 h-2.5 bg-[#0D8FAC] absolute bottom-0 left-1/2 -translate-x-1/2 z-[999]"
-                style={{
-                    clipPath: 'polygon(50% 0%, 100% 100%, 0% 100%)',
-                }}
-            >
+            <div className="w-2.5 h-2.5 bg-[#0D8FAC] absolute bottom-0 left-1/2 -translate-x-1/2 z-[999]" style={{ clipPath: 'polygon(50% 0%, 100% 100%, 0% 100%)' }}>
                 <span className="w-2.5 h-2.5 bg-[#0D8FAC]"></span>
             </div>
 
-            {/* Header */}
             <section className='h-[80vh] overflow-y-scroll custom-scrollbar p-6'>
                 {!isMatchedRoom ? (
-                    <>
-                        <div className="w-full h-full flex items-center justify-center text-red-500 text-lg mb-4 text-center font-semibold">
-                            <p>Warning: No matching information found</p>
-                        </div>
-                    </>
+                    <div className="w-full h-full flex items-center justify-center text-red-500 text-lg mb-4 text-center font-semibold">
+                        <p>Warning: No matching information found</p>
+                    </div>
                 ) : (
                     <>
                         <div className="flex items-center justify-between">
                             <Button variant="ghost" onPress={onClose} className="text-gray-400 w-12 focus:outline-none h-12 text-lg text-center hover:text-white transition-colors cursor-pointer rounded-full">
                                 <Image src="/icons/CloseIcon.svg" alt="Close" width={24} height={24} />
                             </Button>
-
                             <TCornerButton
                                 text={"M"}
                                 isLoading={isMasterPowerOn}
@@ -104,27 +222,25 @@ const ACControlDrawer = ({ data, onClose, isMatchedRoom }: ACControlDrawerProps)
                             />
                         </div>
 
-                        {/* Main Content */}
                         <div className="px-4 space-y-6">
-                            {/* Power Dial */}
+                            {/* POWER DIAL - LIVE DATA */}
                             <div className="flex justify-center mb-8">
                                 <TCircularTemperatureDial
                                     id="temperature-dial"
-                                    value={temperature}
+                                    value={localTemp}                    // Smooth UX
                                     onClick={handlePowerOnOff}
                                     isLoading={isDevicePowerOnLoading}
-                                    runMode={device?.run_mode}
-                                    device_sn={device?.deviceSn}
-                                    device_name={device?.name}
-                                    onChange={(value) => {
-                                        setTemperature(value);
-
-                                        // if value is less than 16, set it to 16, if it is greater than 30, set it to 30
-                                        if (value < 16) {
-                                            setTemperature(16);
-                                        } else if (value > 30) {
-                                            setTemperature(30);
-                                        }
+                                    modes={modes}
+                                    runMode={runMode}                    // LIVE from store
+                                    onChange={(value: any) => {
+                                        setLocalTemp(value);
+                                        setIsDraggingTemp(true);
+                                        if (value < 16) setLocalTemp(16);
+                                        else if (value > 30) setLocalTemp(30);
+                                    }}
+                                    onCommit={(value: any) => {
+                                        setIsDraggingTemp(false);
+                                        handleTemperatureChange(liveDevice?.deviceSn || '', value.toString());
                                     }}
                                     min={16}
                                     max={30}
@@ -132,114 +248,97 @@ const ACControlDrawer = ({ data, onClose, isMatchedRoom }: ACControlDrawerProps)
                                 />
                             </div>
 
-                            {/* Temperature Control */}
+                            {/* TEMPERATURE CONTROL - LIVE DISPLAY */}
                             <div className="flex h-20 items-center justify-center gap-8 mb-8">
                                 <TCornerButton
                                     icon={<Minus size={26} />}
                                     onPress={() => {
-                                        setTemperature(Math.max(16, temperature - 1));
-
-                                        // if value is less than 16, set it to 16
-                                        if (Number(temperature) < 16) {
-                                            setTemperature(16);
-                                        }
+                                        handleTempDecrease(liveDevice?.deviceSn || '');
                                     }}
                                     isBorderActive={true}
-                                    className='w-9 h-9 rounded-tl-lg rounded-br-lg bg-transparent orbitron-font'
+                                    disabled={runMode === 0 ? true : false} // Disable in certain mode
+                                    className={`
+                                        ${isMinTempLockOn ? 'opacity-50 pointer-events-none' : 'bg-transparent cursor-default'}
+                                        w-9 h-9 rounded-tl-lg rounded-br-lg bg-transparent orbitron-font    
+                                    `}
                                 />
-
                                 <div className="text-center">
-                                    <div className="relative flex items-start gap-1 font-bold tracking-tight orbitron-font">
-                                        <input
+                                    <div className={`
+                                        ${runMode === 0 ? 'opacity-50 pointer-events-none' : 'cursor-default'}
+                                        relative flex items-start gap-1 font-bold tracking-tight orbitron-font
+                                    `}>
+                                        {/* <input
                                             type="number"
-                                            value={temperature.toString()}
-                                            onChange={(e) => {
-                                                setTemperature(Number(e.target.value))
-
-                                                // if value is less than 16, set it to 16, if it is greater than 30, set it to 30
-                                                if (Number(e.target.value) < 16) {
-                                                    setTemperature(16);
-                                                } else if (Number(e.target.value) > 30) {
-                                                    setTemperature(30);
-                                                }
-                                            }}
-                                            className="
-                                            bg-transparent
-                                            shadow-none
-                                            outline-none
-                                            border-none
-                                            focus:outline-none 
-                                            focus:ring-0 
-                                            p-0 
-                                            w-[115px]
-                                            text-center
-                                            text-[48px]
-                                            font-[600] 
-                                            tracking-tight
-                                            "
-                                        />
-                                        <span className="text-[48px] leading-none ml-[-10px]">°</span>
-                                    </div>
-                                </div>
-
-                                <TCornerButton
-                                    icon={<Plus size={26} />}
-                                    onPress={() => {
-                                        setTemperature(Math.max(16, temperature + 1));
-
-                                        // if value is greater than 30, set it to 30
-                                        if (Number(temperature) > 29) {
-                                            setTemperature(30);
-                                        }
-                                    }}
-                                    isBorderActive={true}
-                                    className='w-9 h-9 rounded-tl-lg rounded-br-lg bg-transparent orbitron-font'
-                                />
-                            </div>
-
-                            {/* Mode Selection */}
-                            <div className="flex items-center gap-3 mb-6">
-                                {modes.map((mode) => {
-                                    return (
-                                        <TCornerButton
-                                            key={mode.id}
-                                            image={mode.image}
-                                            text={mode.label}
-                                            textSize="text-sm"
-                                            bgColor="#2d2c31"
-                                            borderColor="#27AE60"
-                                            height="h-[90px]"
-                                            width='w-[90px]'
-                                            isActive={selectedMode === mode.id}
-                                            onPress={() => setSelectedMode(mode.id)}
+                                            value={temperature.toString()}      // LIVE from store
+                                            readOnly                          // Prevent manual edit
+                                            disabled={runMode === 0 ? true : false} // Disable in certain mode
                                             className={`
-                                                text-[16px] font-[600]
+                                                bg-transparent pointer-events-none shadow-none outline-none
+                                                border-none focus:outline-none focus:ring-0 p-0 w-[115px]
+                                                text-center text-[48px] font-[600] tracking-tight
+                                            `}
+                                        /> */}
+                                        <TAnimatedNumber
+                                            value={localTemp}
+                                            decimals={0}
+                                            className={`
+                                                bg-transparent pointer-events-none shadow-none outline-none
+                                                border-none focus:outline-none focus:ring-0 p-0 w-[115px]
+                                                text-center text-[48px] font-[600] tracking-tight
                                             `}
                                         />
-                                    );
-                                })}
-                            </div>
-
-                            {/* Divider */}
-                            <div className="border-t border-dashed border-gray-700 my-6"></div>
-
-                            {/* Fan Speed Slider */}
-                            <div className="flex items-center gap-4 mb-6">
-                                <div className="flex-1 relative">
-                                    <div className="h-3 bg-gray-700 rounded-full overflow-hidden">
-                                        <div
-                                            className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full relative"
-                                            style={{ width: `${fanSpeed}%` }}
-                                        >
-                                            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-5 h-5 bg-yellow-400 rounded-full shadow-lg"></div>
-                                        </div>
                                     </div>
                                 </div>
-                                <div className="w-px h-8 bg-gray-600"></div>
-                                <Fan className="text-emerald-400" size={28} />
+                                <TCornerButton
+                                    icon={<Plus size={26} />}
+                                    onPress={() => handleTempIncrease(liveDevice?.deviceSn || '')}
+                                    isBorderActive={true}
+                                    disabled={runMode === 0 ? true : false} // Disable in certain mode
+                                    className={`
+                                        ${isMaxTempLockOn ? 'opacity-50 pointer-events-none' : 'bg-transparent cursor-default'}
+                                        w-9 h-9 rounded-tl-lg rounded-br-lg bg-transparent orbitron-font    
+                                    `}
+                                />
                             </div>
 
-                            {/* Swing Throw */}
+                            {/* Rest of component unchanged - Mode Selection, Fan Speed, etc. */}
+                            <div className="flex items-center gap-3 mb-6">
+                                {modes.map((mode) => (
+                                    <TCornerButton
+                                        key={mode.id}
+                                        image={mode.image}
+                                        text={mode.label}
+                                        textSize="text-sm"
+                                        bgColor="#2d2c31"
+                                        // borderColor="#27AE60"
+                                        borderColor={modes.find((m) => m.id === selectedMode)?.bg || ''}
+                                        height="h-[90px]"
+                                        width='w-[90px]'
+                                        isActive={selectedMode === mode.id}
+                                        onPress={() => {
+                                            setSelectedMode(mode.id);
+                                            handleRunModesControl(mode.mode);
+                                        }}
+                                        className="text-[16px] font-[600]"
+                                    />
+                                ))}
+                            </div>
+
+                            <div className="border-t border-dashed border-gray-700 my-6"></div>
+
+                            <div className="w-full flex items-center gap-4 mb-6">
+                                
+                                {/* Fan Range Slider */}
+                                <TFanSpeedSlider modes={modes.filter(m => m.id === selectedMode)} />
+
+                                <Fan 
+                                    size={28}
+                                    style={{
+                                        color: modes.find(m => m.id === selectedMode)?.bg.replace('bg-[', '').replace(']', '')
+                                    }}
+                                />
+                            </div>
+
                             <div className="flex items-center justify-between p-4 bg-gray-800/50 rounded-lg border-2 border-gray-700 mb-6">
                                 <div className="flex items-center gap-3">
                                     <span className="text-lg font-medium">Swing Throw</span>
@@ -253,21 +352,16 @@ const ACControlDrawer = ({ data, onClose, isMatchedRoom }: ACControlDrawerProps)
                                     <button
                                         onClick={() => setSwingThrow(!swingThrow)}
                                         className={`w-14 h-14 rounded transition-all ${swingThrow
-                                                ? 'bg-emerald-500 shadow-lg shadow-emerald-500/30'
-                                                : 'bg-gray-700'
-                                            }`}
-                                    >
-                                    </button>
+                                            ? 'bg-emerald-500 shadow-lg shadow-emerald-500/30'
+                                            : 'bg-gray-700'
+                                        }`}
+                                    />
                                 </div>
                             </div>
 
-                            {/* Lock Controls Grid */}
                             <div className="grid grid-cols-2 gap-3">
                                 {locks.slice(0, 6).map((lock) => (
-                                    <button
-                                        key={lock.id}
-                                        className="flex items-center gap-3 p-4 bg-gray-800/50 rounded-lg border-2 border-gray-700 hover:border-gray-600 transition-all group"
-                                    >
+                                    <button key={lock.id} className="flex items-center gap-3 p-4 bg-gray-800/50 rounded-lg border-2 border-gray-700 hover:border-gray-600 transition-all group">
                                         {lock.icon === 'remote' ? (
                                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-gray-400 group-hover:text-gray-300">
                                                 <rect x="8" y="4" width="8" height="16" rx="2" stroke="currentColor" strokeWidth="2" />
@@ -297,8 +391,6 @@ const ACControlDrawer = ({ data, onClose, isMatchedRoom }: ACControlDrawerProps)
                                         </span>
                                     </button>
                                 ))}
-
-                                {/* Wired Control Lock - Full Width */}
                                 <button className="col-span-2 flex items-center gap-3 p-4 bg-gray-800/50 rounded-lg border-2 border-gray-700 hover:border-gray-600 transition-all group">
                                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-gray-400 group-hover:text-gray-300">
                                         <path d="M3 12h6m6 0h6M9 12a3 3 0 116 0 3 3 0 01-6 0z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -310,8 +402,7 @@ const ACControlDrawer = ({ data, onClose, isMatchedRoom }: ACControlDrawerProps)
                             </div>
                         </div>
                     </>
-                )
-                }
+                )}
             </section>
         </div>
     );

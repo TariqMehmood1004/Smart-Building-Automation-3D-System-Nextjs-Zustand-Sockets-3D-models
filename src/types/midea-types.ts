@@ -69,6 +69,13 @@ export interface HvacMideaDevice {
   tenantRoom?: TenantRoom;
 }
 
+// API Response Structure
+export interface MideaApiResponse {
+  metadata: HvacMideaDevice[];
+  message?: string;
+  status?: number;
+}
+
 export interface TenantRoom {
   id: number;
   name: string;
@@ -106,13 +113,6 @@ export interface UpdateDevicePayload {
     deviceType: number;
     instructions: { command: string; parameter: unknown }[];
   }[];
-}
-
-// API Response Structure
-export interface MideaApiResponse {
-  metadata: HvacMideaDevice[];
-  message?: string;
-  status?: number;
 }
 
 export interface DeviceHistory {

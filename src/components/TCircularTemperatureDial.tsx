@@ -1,6 +1,15 @@
-import { useMideaStore } from "@/stores/useMideaStore";
 import { Loader, Power } from "lucide-react";
 import { useState, useEffect } from "react";
+
+interface Modes { 
+    id: string; 
+    label: string; 
+    mode: number; 
+    icon: any; 
+    color: string; 
+    bg: string; 
+    image: string 
+};
 
 type Props = {
     id: string;
@@ -8,13 +17,12 @@ type Props = {
     min?: number;
     max?: number;
     step?: number;
+    modes: Modes[];
     disabled?: boolean;
     onChange?: (val: number) => void;
     onCommit?: (val: number) => void;
 
     runMode?: number;
-    device_sn?: string;
-    device_name?: string;
     isLoading?: boolean;
     onClick?: () => void;
 };
@@ -27,20 +35,14 @@ export default function TCircularTemperatureDial({
     step = 1,
     disabled = false,
     onChange,
+    modes,
     onCommit,
     isLoading,
     runMode,
-    device_sn,
-    device_name,
     onClick
 }: Props) {
     const [isDragging, setIsDragging] = useState(false);
     const [tempValue, setTempValue] = useState(value);
-
-    const {
-        isUpdating,
-        updateDevice
-    } = useMideaStore();
 
     const center = 120;
     const trackRadius = 105;
@@ -72,9 +74,33 @@ export default function TCircularTemperatureDial({
     };
 
     useEffect(() => {
+        // if runMode === 0 we cannot change the value
+        if (runMode === 0) {
+            setTempValue(value);
+            return;
+        }
+
+        // If not dragging, update tempValue to match value prop
+        // This allows the dial to reflect changes from outside (e.g. live updates)
         if (!isDragging) {
             setTempValue(value);
         }
+
+        // If dragging, ensure tempValue is within bounds
+        if (tempValue < min) {
+            setTempValue(min);
+        }
+
+        if (tempValue > max) {
+            setTempValue(max);
+        }
+
+        // If value prop changes, update tempValue
+        if (value !== tempValue) {
+            setTempValue(value);
+        }
+
+
     }, [value, isDragging]);
 
     useEffect(() => {
@@ -118,26 +144,22 @@ export default function TCircularTemperatureDial({
 
     const percentage = valueToPercentage(tempValue);
 
-    const isDialDisabled = disabled || runMode === 0;
+    // const isDialDisabled = runMode === 0;
     const isPowerEnabled = runMode === 0; // Only enable power button in this mode
 
-    const handleController = () => {
-        // updateDevice(
-        //     device_sn!,
-        //     {
-        //         device_name: device_name,
-        //         command: "SetTemperature",
-        //         parameter: tempValue
-        //     }
-        // )
-    };
+    const isDialDisabled = runMode === 0 || disabled;
 
+    const activeMode = modes.find(m => m.mode === runMode);
+    const modeColor = activeMode ? activeMode.bg.replace('bg-[', '').replace(']', '') : "#27AE60";
+
+    
     return (
         <div className="flex items-center justify-center">
             <svg
                 id={id}
                 width={center * 2}
                 height={center * 2}
+                
                 onMouseDown={() => !disabled && setIsDragging(true)}
                 className={`select-none ${disabled || isLoading ? "pointer-events-none opacity-50" : "cursor-pointer"}`}
             >
@@ -234,7 +256,17 @@ export default function TCircularTemperatureDial({
                     cy={center}
                     r={trackRadius}
                     fill="none"
-                    stroke={isDialDisabled ? "#27AE60" : "#27AE60"}
+                    // stroke={
+                    //     isDialDisabled ? "#27ae5f36" : "#27AE60"
+
+                    //     // if runMode === 0 (off), use a dimmed green - 
+                    //     // if runMode === 1 (heat), use a dimmed yellow
+                    // }
+                    stroke={
+                        isDialDisabled 
+                            ? `${modeColor}36`       // Dimmed, transparent shade
+                            : modeColor              // Full color when allowed
+                    }
                     strokeWidth="13.33"
                     strokeDasharray={`${2 * Math.PI * trackRadius}`}
                     strokeDashoffset={`${2 * Math.PI * trackRadius * (1 - percentage * 0.75)}`}

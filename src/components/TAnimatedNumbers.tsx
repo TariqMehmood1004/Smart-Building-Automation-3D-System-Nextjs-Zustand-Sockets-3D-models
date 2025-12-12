@@ -16,7 +16,7 @@ export default function TAnimatedNumber({ value, decimals = 0, className }: Anim
   );
 
   // Combine the motion value with static text
-  const display = useMotionTemplate`${rounded}°C`;
+  const display = useMotionTemplate`${rounded}°`;
 
   useEffect(() => {
     const controls = animate(motionValue, value, {
