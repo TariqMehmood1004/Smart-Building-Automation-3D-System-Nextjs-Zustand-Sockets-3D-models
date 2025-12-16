@@ -68,7 +68,7 @@ const TWeatherForecasting: React.FC = () => {
   return (
     <section className="absolute inset-0 w-full min-h-screen">
       {/* Background */}
-      <div className="absolute inset-0 -z-10">
+      <div className="absolute inset-0 -z-10 hidden">
         <Image
           src="/images/cloud-background.png"
           alt="Weather background"
@@ -80,7 +80,7 @@ const TWeatherForecasting: React.FC = () => {
       </div>
 
       {/* Weather Card */}
-      <div className="absolute top-[6rem] right-[1%] z-[9999] flex w-[95%] items-end gap-4 rounded-[10px] p-5 text-2xl font-bold text-[#A1A5A3] pointer-events-none">
+      <div className="absolute top-[6rem] right-[1%] z-[999] flex w-[95%] items-end gap-4 rounded-[10px] p-5 text-2xl font-bold text-[#A1A5A3] pointer-events-none">
         {isSocketLoading || !currentWeather ? (
           <TWeatherForecastingSkeleton />
         ) : (

@@ -50,6 +50,7 @@
   color-scheme: light dark;
   
   /* For Slider FANS Range */
+  --webkit-slider-runnable-track: #4747ff;
   --black: #070709;
   --track: #4747ff;
   --white: #fff;
@@ -183,32 +184,231 @@ body {
   transform-origin: bottom;
 }
 
-/* For Range Slider */
+/* Base range */
 input[type=range] {
   -webkit-appearance: none;
   appearance: none;
-  background-color: transparent;
+  background: transparent;
   width: 100%;
   margin: 0;
   padding: 0;
 }
 
+/* Track: full width, no margins */
+input[type=range]::-webkit-slider-runnable-track {
+  -webkit-appearance: none;
+  height: 10px;
+  /* border-radius: 999px; */
+  background: repeating-linear-gradient(
+    to left,
+    var(--webkit-slider-runnable-track) 0 1px,
+    transparent 1px calc((100% - 1px) / (var(--lines) - 1))
+  );
+  overflow: "hidden",
+}
+
+/* Thumb: centered vertically on track, no scale, no top/right hacks */
 input[type=range]::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 22px;
-  height: 22px;
-  border-radius: 100px;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
   cursor: pointer;
-  border: 2px solid var(--black);
-  background: var(--track);
-  scale: 1.4 1;
+  border: 0;
+  background: #FFFF00;
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
+  position: relative;
+  margin-top: calc(-45px / 2 + 1.1rem);
 }
 
-input[type=range]::-webkit-slider-runnable-track {
-  background: repeating-linear-gradient(
-    to left,
-    rgba(255, 255, 255, 0.15) 0 2px,
-    transparent 2px calc((100% - 2px) / (var(--lines) - 1))
+/* Firefox */
+input[type=range]::-moz-range-track {
+  height: 8px;
+  /* border-radius: 999px; */
+  background: transparent;
+}
+input[type=range]::-moz-range-thumb {
+  width: 45px;
+  height: 45px;
+  /* border-radius: 999px; */
+  border: 0;
+  background: var(--track);
+  cursor: pointer;
+}
+
+
+/* SWITCH TOGGLE BUTTON CSS */
+/* From Uiverse.io by reglobby */ 
+.toggle-container {
+  position: relative;
+  width: 120px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  perspective: 800px;
+  z-index: 5;
+}
+
+.toggle-wrap {
+  position: relative;
+  width: 100%;
+  height: 50px;
+  transform-style: preserve-3d;
+}
+
+.toggle-input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-track {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+  overflow: hidden;
+  backdrop-filter: blur(5px);
+  transition: all 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+  border: 1px solid #FFFFFF1F;
+}
+
+.toggle-thumb {
+  position: absolute;
+  width: 42px;
+  height: 42px;
+  left: 3px;
+  top: 3px;
+  transition: all 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+  z-index: 2;
+  background: #FFFFFF1F;
+  overflow: hidden;
+  transform-style: preserve-3d;
+}
+
+.toggle-data {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+.data-text {
+  position: absolute;
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  transition: all 0.5s ease;
+}
+
+.data-text.off {
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 1;
+}
+
+.data-text.on {
+  left: 15px;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0;
+}
+
+.toggle-label {
+  position: relative;
+  margin-top: 20px;
+  font-size: 16px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  text-align: center;
+  color: rgba(0, 150, 255, 0.7);
+  text-shadow: 0 0 10px rgba(0, 100, 255, 0.5);
+  transition: all 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.toggle-input:checked + .toggle-track .toggle-thumb {
+  left: calc(100% - 57px);
+  background: radial-gradient(
+    circle,
+    rgba(0, 255, 150, 0.8) 100%,
+    rgba(0, 100, 50, 0.4) 100%
   );
 }
+
+.toggle-input:checked + .toggle-track .thumb-scan {
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0) 0%,
+    rgba(0, 255, 150, 0.5) 20%,
+    rgba(255, 255, 255, 0.8) 50%,
+    rgba(0, 255, 150, 0.5) 80%,
+    rgba(0, 0, 0, 0) 100%
+  );
+}
+
+.toggle-input:checked + .toggle-track .thumb-particle {
+  background: rgba(100, 255, 200, 0.8);
+  box-shadow: 0 0 5px rgba(100, 255, 200, 0.8);
+}
+
+.toggle-input:checked + .toggle-track .data-text.off {
+  opacity: 0;
+}
+
+.toggle-input:checked + .toggle-track .data-text.on {
+  opacity: 1;
+}
+
+.toggle-input:checked + .toggle-track .status-indicator.off {
+  opacity: 0;
+}
+
+.toggle-input:checked + .toggle-track .status-indicator.on {
+  opacity: 1;
+}
+
+.toggle-input:checked + .toggle-track .energy-rings {
+  left: calc(100% - 57px);
+}
+
+.toggle-input:checked + .toggle-track .energy-ring {
+  opacity: 1;
+}
+
+.toggle-input:checked + .toggle-track .energy-ring:nth-child(1) {
+  border-top-color: rgba(0, 255, 150, 0.5);
+  border-right-color: rgba(0, 255, 150, 0.3);
+}
+
+.toggle-input:checked + .toggle-track .energy-ring:nth-child(2) {
+  border-bottom-color: rgba(0, 255, 150, 0.5);
+  border-left-color: rgba(0, 255, 150, 0.3);
+}
+
+.toggle-input:checked + .toggle-track .energy-ring:nth-child(3) {
+  border-left-color: rgba(0, 255, 150, 0.5);
+  border-top-color: rgba(0, 255, 150, 0.3);
+}
+
+.toggle-input:checked + .toggle-track .interface-line {
+  background: rgba(0, 255, 150, 0.3);
+}
+
+.toggle-input:checked ~ .toggle-label {
+  color: rgba(0, 255, 150, 0.7);
+  text-shadow: 0 0 10px rgba(0, 255, 150, 0.5);
+}
+
+.toggle-input:checked + .toggle-track .holo-glow {
+  background: radial-gradient(
+    ellipse at center,
+    rgba(0, 255, 150, 0.2) 0%,
+    rgba(0, 0, 0, 0) 70%
+  );
+}
+
+/* SWITCH TOGGLE BUTTON CSS */

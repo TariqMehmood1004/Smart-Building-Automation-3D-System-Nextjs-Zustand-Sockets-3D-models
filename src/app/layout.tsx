@@ -32,7 +32,7 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <TClientToaster />
-        {/* <THeader /> */}
+        <THeader />
         {children}
       </body>
     </html>

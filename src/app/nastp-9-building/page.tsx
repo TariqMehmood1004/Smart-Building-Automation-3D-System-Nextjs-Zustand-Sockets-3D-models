@@ -18,6 +18,9 @@ import chalk from "chalk";
 import ACControlDrawer from "@/components/TACController";
 import { HvacMideaDevice } from "@/types/midea-types";
 import TWeatherForcasting from "@/components/TWeatherForcasting";
+import { activeStatus, getActiveStatus, MideaRunModes } from "@/types/types";
+import TWeatherForcastingWith3DModel from "@/components/TWeatherForcastingWith3DModel";
+
 
 function FrameModel({ model }: { model: THREE.Object3D }) {
   const { camera, controls } = useThree();
@@ -32,17 +35,17 @@ function FrameModel({ model }: { model: THREE.Object3D }) {
     const box = new THREE.Box3().setFromObject(model);
     const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
-    const maxDim = Math.max(size.x, size.z); // Use x and z for top-down view
+    const maxDim = Math.max(size.x, size.z);
 
     if (camera instanceof THREE.PerspectiveCamera) {
       const fov = (camera.fov * Math.PI) / 180;
       const distance = (maxDim / 3) / Math.tan(fov / 2) * 1.0;
       
       // Position camera directly above the model (top-down view)
-      camera.position.set(center.x + 2.5, center.y + distance, center.z);
+      camera.position.set(center.x + 2.5, center.y + distance + 1.2, center.z);
       camera.lookAt(center.x, center.y, center.z);
       
-      camera.near = Math.max(0.1, distance / 100);
+      camera.near = Math.max(0.5, distance / 100);
       camera.far = distance * 10;
       camera.updateProjectionMatrix();
     }
@@ -52,9 +55,11 @@ function FrameModel({ model }: { model: THREE.Object3D }) {
       (controls as OrbitControlsImpl).update();
     }
 
-    // Center the model at origin and rotate 90 degrees to make it horizontal
+    // Center the model at origin (0, 0, 0)
     model.position.set(-center.x, -center.y, -center.z);
-    model.rotation.y = Math.PI / 2; // Rotate 90 degrees clockwise
+    
+    // Keep rotation if needed
+    // model.rotation.y = Math.PI / 1;
 
   }, [model, camera, controls]);
 
@@ -135,72 +140,120 @@ function ModelContent({
   }, [scene]);
 
   const handleClick = (pos: [number, number, number], index: number, name: string) => {
-    if (!controlsRef.current) return;
+      if (!controlsRef.current) return;
 
-    const targetVec = new THREE.Vector3(...pos);
-    const dir = new THREE.Vector3()
-      .subVectors(camera.position, controlsRef.current.target)
-      .normalize();
+      const targetVec = new THREE.Vector3(...pos);
+      
+      // Get camera's current direction but position at fixed distance from target
+      const currentDir = new THREE.Vector3()
+          .subVectors(camera.position, controlsRef.current.target)
+          .normalize();
+      
+      // DISTANCE from target (adjust this value)
+      const zoomDistance = 22.0; // Try 6-12 for good room overview
+      
+      camera.position.copy(targetVec.clone().add(currentDir.multiplyScalar(zoomDistance)));
+      controlsRef.current.target.copy(targetVec);
+      controlsRef.current.update();
 
-    camera.position.copy(targetVec.clone().add(dir.multiplyScalar(0.5)));
-    controlsRef.current.target.copy(targetVec);
-    controlsRef.current.update();
-
-    setActiveIndex(index);
-    onOpenDrawer(index, name);
+      setActiveIndex(index);
+      onOpenDrawer(index, name);
   };
 
+  const handleOnZoomClick = (pos: [number, number, number], index: number) => {
+      if (!controlsRef.current) return;
+
+      const targetVec = new THREE.Vector3(...pos);
+      
+      // Get camera's current direction but position at fixed distance from target
+      const currentDir = new THREE.Vector3()
+          .subVectors(camera.position, controlsRef.current.target)
+          .normalize();
+      
+      // DISTANCE from target (adjust this value)
+      const zoomDistance = 22.0; // Try 6-12 for good room overview
+      
+      camera.position.copy(targetVec.clone().add(currentDir.multiplyScalar(zoomDistance)));
+      controlsRef.current.target.copy(targetVec);
+      controlsRef.current.update();
+
+      setActiveIndex(index);
+  };
+
+  // In hotspotMeshes useMemo
   const hotspotMeshes = useMemo(() => {
-    return childPositions.map((p) => {
-        const assignedName = data?.metadata.map(d => d.tenantRoom?.assigned_name === p.name ? d.deviceSn : null).filter(Boolean)[0] || `${p.name}: Unknown Room`;
-        const temperature = data?.metadata.map(d => d.tenantRoom?.assigned_name === p.name ? d.set_temperature : null).filter(Boolean)[0] || 0;
-        
-        const newData = data?.metadata.map(d => d.tenantRoom?.assigned_name === p.name ? d : null).filter(Boolean)[0] || null;
-        // console.log(chalk.blue(`newData for ${p.name}: ${JSON.stringify(newData, null, 4)}`));
-        
-        return (
-          <mesh
-            key={p.uuid}
-            position={p.pos as unknown as THREE.Vector3}
-            // onPointerOver={(e) => { e.stopPropagation(); setHoveredUuid(p.uuid); document.body.style.cursor = "pointer"; }}
-            onPointerOver={(e) => { e.stopPropagation(); setHoveredUuid(p.uuid) }}
-            onPointerOut={() => { setHoveredUuid(null); document.body.style.cursor = "default"; }}
-          // onClick={(e) => { e.stopPropagation(); handleClick(p.pos, p.index, p.name); }}
-          >
-            <sphereGeometry args={[0.2, 100, 100]} />
-            <meshStandardMaterial
-              color={hoveredUuid === p.uuid ? "" : "blue"}
-              transparent
-              opacity={0.45}
-            />
-            <Html position={[0, 0.05, 0]} distanceFactor={4.5} center className="w-[200px] flex font-[600] inter-tight flex-col items-center gap-[6px]">
+      return childPositions.map((p) => {
+        console.log(chalk.green(`Processing hotspot for ${JSON.stringify(p, null, 4)}`));
 
-              {isSocketLoading ? (
-                <Loader className="animate-spin w-6 h-6 text-white" />
-              ) : (
-                <>
-                  <div className="flex gap-2 items-center text-white">
-                    <span>{assignedName}</span>
-                  </div>
+          const assignedName = data?.metadata.map(d => d.tenantRoom?.assigned_name === p.name ? d.deviceSn : null).filter(Boolean)[0] || `${p.name}: Unknown Room`;
+          const temperature = data?.metadata.map(d => d.tenantRoom?.assigned_name === p.name ? d.set_temperature : null).filter(Boolean)[0] || 0;
+          
+          const newData = data?.metadata.map(d => d.tenantRoom?.assigned_name === p.name ? d : null).filter(Boolean)[0] || null;
+          
+          // Get the actual run mode from newData
+          const currentRunMode = newData?.run_mode;
+          const runModeBGColor = MideaRunModes.find(m => m.mode === currentRunMode)?.bg || '#27AE60'; // default to Auto
+          
+          // Map run_mode number to activeStatus string
+          const activeStatus = getActiveStatus(currentRunMode as number);
 
-                  <div className="shadow-lg w-fit bg-black p-2 flex items-center justify-center rounded-full cursor-pointer hover:scale-110 ease-in-out duration-300">
-                    <THvacStatusIcon
-                      width={25}
-                      height={25}
-                      activeStatus="Dry"
-                      onClick={() => { handleClick(p.pos, p.index, p.name); }}
-                    />
-                  </div>
-                  <span className="flex flex-col items-center bg-black p-1 px-2.5 rounded-[4px] border border-[#FFFFFF29]">
-                    <p className="text-white text-[14px]">{temperature}° C</p>
-                  </span>
-                </>
-              )}
-            </Html>
-          </mesh>
-        );
-    });
+          console.log(chalk.blue(`activeStatus for ${p.name}: ${activeStatus}`));
+
+          return (
+              <mesh
+                  key={p.uuid}
+                  position={p.pos as unknown as THREE.Vector3}
+                  onPointerOver={(e) => { e.stopPropagation(); setHoveredUuid(p.uuid); document.body.style.cursor = "pointer"; }}
+                  onPointerOut={() => { setHoveredUuid(null); document.body.style.cursor = "default"; }}
+                  onClick={(e) => { 
+                      e.stopPropagation(); 
+                      handleOnZoomClick(p.pos, p.index);  // Your existing zoom function
+                  }}
+              >
+                  {/* <sphereGeometry args={[0.85, 100, 100]} /> */}
+
+                  {/* Rectangle with hover */}
+                  <boxGeometry 
+                    args={[2.3, 3.6, 1.6]}
+                  />
+
+                  <meshBasicMaterial
+                    color={hoveredUuid === p.uuid ? "" : "blue"}
+                    transparent={true}
+                    opacity={hoveredUuid === p.uuid ? 0 : 0}
+                    side={THREE.DoubleSide}
+                />
+
+                  <Html position={[0, 0.05, 0]} distanceFactor={4.5} center className="w-[200px] flex font-[600] inter-tight flex-col items-center gap-[6px]">
+
+                      {isSocketLoading ? (
+                          <Loader className="animate-spin w-6 h-6 text-white" />
+                      ) : (
+                          <>
+                              <div className="flex gap-2 items-center text-white">
+                                  <span>{assignedName}</span>
+                              </div>
+
+                              <div className="shadow-lg w-fit bg-black p-2 flex items-center justify-center rounded-full cursor-pointer hover:scale-110 ease-in-out duration-300">
+                                  <THvacStatusIcon
+                                      width={25}
+                                      height={25}
+                                      activeStatus={activeStatus}  // Use actual run mode
+                                      className={`!bg-[${runModeBGColor}]`}  // Use dynamic bg color
+                                      onClick={() => { handleClick(p.pos, p.index, p.name); }}
+                                  />
+                              </div>
+                              <span className="flex flex-col items-center bg-black p-1 px-2.5 rounded-[4px] border border-[#FFFFFF29]">
+                                  <p className="text-white text-[14px]">{temperature}° C</p>
+                              </span>
+                          </>
+                      )}
+                  </Html>
+              </mesh>
+          );
+      });
   }, [childPositions, hoveredUuid, data, isSocketLoading]);
+
 
   return (
     <group>
@@ -244,12 +297,25 @@ export default function ModelViewer() {
     onClose();
   }, [onClose, drawerOpen, selectedRoomName]);
 
+  // url="/models/Delta_9_Exterior-Model.glb"
+  let background_model = "/models/Delta_9_Exterior-Model.glb";
+
   
   return (
-    <div className="w-screen h-screen flex items-center justify-center bg-[#373737]">
+    <div className="w-screen h-screen flex items-center justify-center">
+      
+      <TWeatherForcasting />
+
       <Canvas 
         camera={{ fov: 5, near: 1.5, far: 2000 }}
         className="w-full h-full"
+        style={{
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
       >
         <Suspense
           fallback={
@@ -271,19 +337,41 @@ export default function ModelViewer() {
             </Html>
           }>
 
-          <ambientLight intensity={1.0} />
+          <ambientLight intensity={2.0} />
           <directionalLight position={[10, 10, 5]} intensity={1} />
           <directionalLight position={[-10, -10, -5]} intensity={0.5} />
           
           <ModelContent
-            url="/models/D_9_GF-22.glb"
-            controlsRef={controlsRef}
-            onOpenDrawer={handleOpenDrawer}
-          />
+              // url="/models/D_9_GF-22.glb"
+              url={background_model}
+              controlsRef={controlsRef}
+              onOpenDrawer={handleOpenDrawer}
+            />
+
+            <ModelContent
+              // url="/models/D_9_GF-22.glb"
+              url="/models/D_9_GF-Main.glb"
+              // url={background_model}
+              controlsRef={controlsRef}
+              onOpenDrawer={handleOpenDrawer}
+            />
         </Suspense>
 
         {/* disable orbit controls */}
         <OrbitControls
+          ref={controlsRef}
+          enableRotate={false}
+          enableZoom={true}
+          maxZoom={10}      // ← Much lower (less zoom in)
+          minZoom={20}      // ← Allow minimal zoom
+          enablePan={true}
+          minDistance={22}  // ← Much higher minimum distance
+          maxDistance={100} // ← Higher max distance
+          maxPolarAngle={Math.PI / 2.5}
+          minPolarAngle={0}
+        />
+
+        {/* <OrbitControls
           ref={controlsRef}
           enableRotate={false}
           enableZoom={true}
@@ -303,7 +391,7 @@ export default function ModelViewer() {
             // Log model position
             // console.log("Model Position:", modelRef.current?.position);
           }}
-        />
+        /> */}
       </Canvas>
 
       {/* Simple Drawer */}

@@ -45,7 +45,7 @@ const ACControlDrawer = ({
     // Local states for UX (don't conflict with live data)
     const [selectedMode, setSelectedMode] = useState('auto');
     const [swingThrow, setSwingThrow] = useState(true);
-    const [fanSpeed, setFanSpeed] = useState(60);
+    const [fanSpeed, setFanSpeed] = useState(5);
     const [isMinTempLockOn, setIsMinTempLockOn] = useState(false);
     const [isMaxTempLockOn, setIsMaxTempLockOn] = useState(false);
 
@@ -188,16 +188,26 @@ const ACControlDrawer = ({
         };
     }, []);
 
+    const selectedColor = useMemo(() => {
+        const mode = modes.find(m => m.id === selectedMode);
+        return mode ? mode.bg : '#FFFFFF';
+    }, [selectedMode, modes]);
+
+    console.log("Selected Mode BG:", selectedColor);
+
     return (
-        <div className="w-full mx-auto bg-[#16161A] text-white border border-[#0D8FAC] shadow-2xl relative overflow-hidden">
+        <div className="w-full z-[1000] mx-auto bg-[#16161A] text-white border border-[#0D8FAC] shadow-2xl relative overflow-hidden">
+            
             {/* Cyan corners decoration - unchanged */}
             <div className="w-2.5 h-2.5 bg-[#0D8FAC] absolute top-0 left-1/2 -translate-x-1/2 z-[999]" style={{ clipPath: 'polygon(0% 0%, 100% 0%, 50% 100%)' }}>
                 <span className="w-2.5 h-2.5 bg-[#0D8FAC]"></span>
             </div>
+
             <span className="w-2.5 h-2.5 bg-[#0D8FAC] absolute top-0 left-0 z-[999]"></span>
             <span className="w-2.5 h-2.5 bg-[#0D8FAC] absolute top-0 right-0 z-[999]"></span>
             <span className="w-2.5 h-2.5 bg-[#0D8FAC] absolute bottom-0 right-0 z-[999]"></span>
             <span className="w-2.5 h-2.5 bg-[#0D8FAC] absolute bottom-0 left-0 z-[999]"></span>
+            
             <div className="w-2.5 h-2.5 bg-[#0D8FAC] absolute bottom-0 left-1/2 -translate-x-1/2 z-[999]" style={{ clipPath: 'polygon(50% 0%, 100% 100%, 0% 100%)' }}>
                 <span className="w-2.5 h-2.5 bg-[#0D8FAC]"></span>
             </div>
@@ -267,17 +277,6 @@ const ACControlDrawer = ({
                                         ${runMode === 0 ? 'opacity-50 pointer-events-none' : 'cursor-default'}
                                         relative flex items-start gap-1 font-bold tracking-tight orbitron-font
                                     `}>
-                                        {/* <input
-                                            type="number"
-                                            value={temperature.toString()}      // LIVE from store
-                                            readOnly                          // Prevent manual edit
-                                            disabled={runMode === 0 ? true : false} // Disable in certain mode
-                                            className={`
-                                                bg-transparent pointer-events-none shadow-none outline-none
-                                                border-none focus:outline-none focus:ring-0 p-0 w-[115px]
-                                                text-center text-[48px] font-[600] tracking-tight
-                                            `}
-                                        /> */}
                                         <TAnimatedNumber
                                             value={localTemp}
                                             decimals={0}
@@ -324,12 +323,17 @@ const ACControlDrawer = ({
                                 ))}
                             </div>
 
-                            <div className="border-t border-dashed border-gray-700 my-6"></div>
+                            <div 
+                                style={{
+                                    borderColor: selectedColor
+                                }}
+                                className={`dashed-line w-full h-0 border-t border-dashed border-[${selectedColor}]`}
+                            ></div>
 
                             <div className="w-full flex items-center gap-4 mb-6">
                                 
                                 {/* Fan Range Slider */}
-                                <TFanSpeedSlider modes={modes.filter(m => m.id === selectedMode)} />
+                                <TFanSpeedSlider fanSpeed={fanSpeed} modes={modes.filter(m => m.id === selectedMode)} />
 
                                 <Fan 
                                     size={28}
@@ -339,25 +343,49 @@ const ACControlDrawer = ({
                                 />
                             </div>
 
-                            <div className="flex items-center justify-between p-4 bg-gray-800/50 rounded-lg border-2 border-gray-700 mb-6">
+                            <div className="flex items-center justify-between py-4 mb-6">
                                 <div className="flex items-center gap-3">
                                     <span className="text-lg font-medium">Swing Throw</span>
-                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-gray-400">
-                                        <path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                                        <path d="M8 6v12M16 6v12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                                    </svg>
+                                    <Image src={"/icons/swing-throw.svg"} width={28} height={28} alt="Swing Throw" />
                                 </div>
-                                <div className="flex items-center gap-3">
-                                    <span className="text-sm font-medium text-gray-300">ON</span>
-                                    <button
-                                        onClick={() => setSwingThrow(!swingThrow)}
-                                        className={`w-14 h-14 rounded transition-all ${swingThrow
-                                            ? 'bg-emerald-500 shadow-lg shadow-emerald-500/30'
-                                            : 'bg-gray-700'
-                                        }`}
-                                    />
+
+                                <div className="toggle-container">
+                                    <Button onPress={() => setSwingThrow(prev => !prev)} className="toggle-wrap">
+                                        <input
+                                            className="toggle-input"
+                                            id="holo-toggle"
+                                            type="checkbox"
+                                            checked={swingThrow}
+                                            onChange={() => setSwingThrow(prev => !prev)}
+                                        />
+
+                                        <label className="toggle-track" htmlFor="holo-toggle">
+                                        <div
+                                            className="toggle-thumb"
+                                            style={{
+                                            background: swingThrow
+                                                ? `radial-gradient(circle, ${selectedColor}CC 100%, ${selectedColor}66 100%)`
+                                                : `radial-gradient(circle, #ffffff23 100%, #ffffff23 100%)`,
+                                            borderColor: swingThrow ? `${selectedColor}100` : '',
+                                            }}
+                                        >
+                                            <div className="thumb-core"></div>
+                                        </div>
+
+                                        <div className="toggle-data">
+                                            <div className="data-text off">OFF</div>
+                                            <div className="data-text on">ON</div>
+                                        </div>
+                                        </label>
+                                    </Button>
                                 </div>
                             </div>
+                            <div 
+                                style={{
+                                    borderColor: selectedColor
+                                }}
+                                className={`dashed-line w-full h-0 border-t border-dashed border-[${selectedColor}]`}
+                            ></div>
 
                             <div className="grid grid-cols-2 gap-3">
                                 {locks.slice(0, 6).map((lock) => (
@@ -404,6 +432,7 @@ const ACControlDrawer = ({
                     </>
                 )}
             </section>
+
         </div>
     );
 };
