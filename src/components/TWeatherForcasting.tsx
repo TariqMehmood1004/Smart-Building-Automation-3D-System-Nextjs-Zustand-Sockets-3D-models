@@ -66,7 +66,7 @@ const TWeatherForecasting: React.FC = () => {
   }, [currentWeather]);
 
   return (
-    <section className="absolute inset-0 w-full min-h-screen">
+    <section className="absolute inset-0 w-full min-h-screen bg-[#000000]">
       {/* Background */}
       <div className="absolute inset-0 -z-10 hidden">
         <Image
