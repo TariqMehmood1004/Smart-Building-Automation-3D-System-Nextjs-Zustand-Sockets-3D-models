@@ -9,10 +9,15 @@ interface Modes {
     icon: any; 
     color: string; 
     bg: string; 
-    image: string 
+    image: string;
 };
 
-export default function TFanSpeedSlider({ modes, fanSpeed }: { modes: Modes[]; fanSpeed: number }) {
+export default function TFanSpeedSlider({ modes, fanSpeed, onFanSpeedChange }: 
+    { 
+        modes: Modes[]; 
+        fanSpeed: number;
+        onFanSpeedChange: (val: number) => void;
+    }) {
     const [value, setValue] = useState(fanSpeed); // 0–6
 
     const activeMode = modes[0];                
@@ -65,10 +70,10 @@ export default function TFanSpeedSlider({ modes, fanSpeed }: { modes: Modes[]; f
                 {Array.from({ length: steps }, (_, i) => (
                     <span
                         key={`step-${i}`}
-                        className="h-full w-[6px] absolute top-[25%] transform translate-y-1/2"
+                        className="h-full w-[6px] absolute top-[23%] transform translate-y-1/2"
                         style={{
                             left: `${i * (100 / max)}%`,
-                            height: "18px",        // Larger height for steps
+                            height: "19.5px",        // Larger height for steps
                             width: "6px",          // Thicker
                             background: activeBg,
                             transition: "all 180ms linear",
@@ -100,7 +105,10 @@ export default function TFanSpeedSlider({ modes, fanSpeed }: { modes: Modes[]; f
                     max={max}
                     step={1}
                     value={value}
-                    onChange={(e) => setValue(Number(e.target.value))}
+                    onChange={(e) => {
+                        onFanSpeedChange(Number(e.target.value)); 
+                        setValue(Number(e.target.value))
+                    }}
                     className="w-full"
                     style={{
                         ["--track" as any]: activeBg,

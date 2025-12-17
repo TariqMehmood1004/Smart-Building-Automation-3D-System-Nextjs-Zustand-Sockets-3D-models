@@ -39,13 +39,14 @@ const ACControlDrawer = ({
     }, [device, storeData?.metadata]);
 
     // LIVE VALUES - Sync with store automatically
-    const temperature = liveDevice?.set_temperature || 24;
+    const temperature = liveDevice?.set_temperature || 0;
     const runMode = liveDevice?.run_mode || 0;
 
     // Local states for UX (don't conflict with live data)
     const [selectedMode, setSelectedMode] = useState('auto');
+    const [selectedLock, setSelectedLock] = useState('');
     const [swingThrow, setSwingThrow] = useState(true);
-    const [fanSpeed, setFanSpeed] = useState(5);
+    const [fanSpeed, setFanSpeed] = useState(device?.fan_speed || 0);
     const [isMinTempLockOn, setIsMinTempLockOn] = useState(false);
     const [isMaxTempLockOn, setIsMaxTempLockOn] = useState(false);
 
@@ -61,14 +62,23 @@ const ACControlDrawer = ({
     ];
     
     const locks = [
-        { id: 'cool-lock', label: 'Cool Lock', icon: Wind },
-        { id: 'heat-lock', label: 'Heat Lock', icon: Flame },
-        { id: 'onoff-lock', label: 'On/Off Lock', icon: Power },
-        { id: 'remote-lock', label: 'Remote Lock', icon: 'remote' },
-        { id: 'max-temp', label: 'Max Temp Lock', icon: 'temp-max' },
-        { id: 'min-temp', label: 'Min Temp Lock', icon: 'temp-min' },
-        { id: 'wired-control', label: 'Wired Control Lock', icon: 'wired', fullWidth: true }
+        { id: 'cool-lock', label: 'Cool Lock', icon: Wind,  mode: 66, image: "/icons/cool-lock.svg" },
+        { id: 'heat-lock', label: 'Heat Lock', icon: Flame, mode: 67, image: "/icons/heat-lock.svg"},
+        { id: 'onoff-lock', label: 'On/Off Lock', icon: Power, mode: 0, image: "/icons/on-off-lock.svg" },
+        { id: 'remote-lock', label: 'Remote Lock', icon: 'remote', mode: 0, image: "/icons/remote-lock.svg" },
+        { id: 'max-temp', label: 'Max Temp Lock', icon: 'temp-max', mode: 0, image: "/icons/max-temp-lock.svg" },
+        { id: 'min-temp', label: 'Min Temp Lock', icon: 'temp-min', mode: 0, image: "/icons/min-temp-lock.svg" },
+        { id: 'wired-control', label: 'Wired Control Lock', icon: 'wired', mode: 0, fullWidth: true, image: "/icons/WDC.svg" }
     ];
+
+    const [activeLocks, setActiveLocks] = useState<Record<string, boolean>>({
+        'cool-lock': false,
+        'heat-lock': false,
+        'onoff-lock': false,
+        'remote-lock': false,
+        'max-temp': false,
+        'min-temp': false,
+    });
 
     const handlePowerOnOff = useCallback(() => {
         devicePowerOnOff(device?.deviceSn || '');
@@ -95,6 +105,43 @@ const ACControlDrawer = ({
             ]
         });
     }, [devicePowerOnOff, device?.deviceSn]);
+
+    const debounceLockRef = useRef<NodeJS.Timeout | null>(null);
+    const handleLockControls = useCallback((deviceSn: string, lockId: string, mode: number) => {
+        // Clear existing timeout
+        if (debounceLockRef.current) {
+            clearTimeout(debounceLockRef.current);
+        }
+        
+        // Toggle local state immediately for UX
+        setActiveLocks(prev => ({
+            ...prev,
+            [lockId]: !prev[lockId]
+        }));
+        
+        // Debounce API call for 5 seconds
+        debounceLockRef.current = setTimeout(() => {
+            updateDevice(deviceSn, {
+                "device_name": deviceSn,
+                "content": [{
+                    "deviceType": 4,
+                    "instructions": [{
+                        "command": "IduMode",
+                        "parameter": mode
+                    }]
+                }]
+            });
+        }, 5000);
+    }, [updateDevice]);
+
+    // Cleanup
+    useEffect(() => {
+        return () => {
+            if (debounceLockRef.current) {
+                clearTimeout(debounceLockRef.current);
+            }
+        };
+    }, []);
 
     const handleTemperatureChange = useCallback((device_sn: string, set_temperature: string) => {
         
@@ -195,6 +242,40 @@ const ACControlDrawer = ({
 
     console.log("Selected Mode BG:", selectedColor);
 
+    // Debounced version - only calls updateDevice after 5 seconds of no changes
+    const handleFanSpeedChange = useCallback((deviceSn: string, val: number) => {
+        // Clear any existing timeout
+        if (debounceRef.current) {
+            clearTimeout(debounceRef.current);
+        }
+        
+        // Set new timeout for 1 seconds (1000ms)
+        debounceRef.current = setTimeout(() => {
+            updateDevice(deviceSn, {
+                "device_name": deviceSn,
+                "content": [{
+                    "deviceType": 4,
+                    "instructions": [{
+                        "command": "SetFanSpeed",
+                        "parameter": val
+                    }]
+                }]
+            });
+        }, 1000);
+    }, [updateDevice]);
+
+    // Add this ref outside the callback (in your component)
+    const debounceRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Cleanup on unmount
+    useEffect(() => {
+        return () => {
+            if (debounceRef.current) {
+                clearTimeout(debounceRef.current);
+            }
+        };
+    }, []);
+
     return (
         <div className="w-full z-[1000] mx-auto bg-[#16161A] text-white border border-[#0D8FAC] shadow-2xl relative overflow-x-hidden">
             
@@ -212,7 +293,7 @@ const ACControlDrawer = ({
                 <span className="w-2.5 h-2.5 bg-[#0D8FAC]"></span>
             </div>
 
-            <section className='h-[80vh] overflow-y-scroll overflow-x-hidden custom-scrollbar p-6'>
+            <section className='h-[85vh] overflow-y-scroll overflow-x-hidden custom-scrollbar p-6'>
                 {!isMatchedRoom ? (
                     <div className="w-full h-full flex items-center justify-center text-red-500 text-lg mb-4 text-center font-semibold">
                         <p>Warning: No matching information found</p>
@@ -300,7 +381,7 @@ const ACControlDrawer = ({
                                 />
                             </div>
 
-                            {/* Rest of component unchanged - Mode Selection, Fan Speed, etc. */}
+                            {/* Mode Selection, Fan Speed, etc. */}
                             <div className="flex items-center gap-3 mb-6">
                                 {modes.map((mode) => (
                                     <TCornerButton
@@ -322,7 +403,8 @@ const ACControlDrawer = ({
                                     />
                                 ))}
                             </div>
-
+                            
+                            {/* DASHED LINE */}
                             <div 
                                 style={{
                                     borderColor: selectedColor
@@ -330,10 +412,18 @@ const ACControlDrawer = ({
                                 className={`dashed-line w-full h-0 border-t border-dashed border-[${selectedColor}]`}
                             ></div>
 
+                            {/* FAN SPEED */}
                             <div className="w-full flex items-center gap-4 mb-6">
                                 
                                 {/* Fan Range Slider */}
-                                <TFanSpeedSlider fanSpeed={fanSpeed} modes={modes.filter(m => m.id === selectedMode)} />
+                                <TFanSpeedSlider 
+                                    fanSpeed={fanSpeed} 
+                                    onFanSpeedChange={() => {
+                                        handleFanSpeedChange(liveDevice?.deviceSn || '', fanSpeed);
+                                        setFanSpeed(fanSpeed);
+                                    }} 
+                                    modes={modes.filter(m => m.id === selectedMode)} 
+                                />
 
                                 <Fan 
                                     size={28}
@@ -342,7 +432,8 @@ const ACControlDrawer = ({
                                     }}
                                 />
                             </div>
-
+                            
+                            {/* SWING THROW */}
                             <div className="flex items-center relative justify-between py-4 mb-6">
                                 <div className="flex items-center gap-3">
                                     <span className="text-lg font-medium">Swing Throw</span>
@@ -350,7 +441,7 @@ const ACControlDrawer = ({
                                 </div>
 
                                 <div className="toggle-container">
-                                    <div typeof='button' onClick={() => setSwingThrow(prev => !prev)} className="toggle-wrap">
+                                    <div onClick={() => setSwingThrow(prev => !prev)} className="toggle-wrap">
                                         <input
                                             className="toggle-input"
                                             id="holo-toggle"
@@ -381,6 +472,7 @@ const ACControlDrawer = ({
                                 </div>
                             </div>
 
+                            {/* DASHED LINE */}
                             <div 
                                 style={{
                                     borderColor: selectedColor
@@ -388,46 +480,39 @@ const ACControlDrawer = ({
                                 className={`dashed-line w-full h-0 border-t border-dashed border-[${selectedColor}]`}
                             ></div>
 
+                            {/* LOCKS */}
                             <div className="grid grid-cols-2 gap-3">
                                 {locks.slice(0, 6).map((lock) => (
-                                    <button key={lock.id} className="flex items-center gap-3 p-4 bg-gray-800/50 rounded-lg border-2 border-gray-700 hover:border-gray-600 transition-all group">
-                                        {lock.icon === 'remote' ? (
-                                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-gray-400 group-hover:text-gray-300">
-                                                <rect x="8" y="4" width="8" height="16" rx="2" stroke="currentColor" strokeWidth="2" />
-                                                <circle cx="12" cy="8" r="1.5" fill="currentColor" />
-                                                <circle cx="12" cy="12" r="1.5" fill="currentColor" />
-                                                <circle cx="12" cy="16" r="1.5" fill="currentColor" />
-                                            </svg>
-                                        ) : lock.icon === 'temp-max' ? (
-                                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-gray-400 group-hover:text-gray-300">
-                                                <path d="M12 2v10M8 8l4-4 4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                                <circle cx="12" cy="16" r="3" stroke="currentColor" strokeWidth="2" />
-                                            </svg>
-                                        ) : lock.icon === 'temp-min' ? (
-                                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-gray-400 group-hover:text-gray-300">
-                                                <path d="M12 12v10M8 18l4 4 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                                <circle cx="12" cy="8" r="3" stroke="currentColor" strokeWidth="2" />
-                                            </svg>
-                                        ) : lock.icon === 'wired' ? (
-                                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-gray-400 group-hover:text-gray-300">
-                                                <path d="M3 12h6m6 0h6M9 12a3 3 0 116 0 3 3 0 01-6 0z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                                            </svg>
-                                        ) : (
-                                            React.createElement(lock.icon, { size: 24, className: "text-gray-400 group-hover:text-gray-300" })
-                                        )}
-                                        <span className="text-sm font-medium text-gray-300 group-hover:text-white transition-colors">
-                                            {lock.label}
-                                        </span>
-                                    </button>
+                                    <TCornerButton
+                                        key={lock.id}
+                                        text={lock.label}
+                                        image={lock.image}
+                                        bgColor="#2d2c31"
+                                        borderColor={modes.find((m) => m.id === selectedMode)?.bg || '#179BB9'}
+                                        onPress={() => {
+                                            handleLockControls(liveDevice?.deviceSn || '', lock.id, lock.mode);
+                                        }}
+                                        isActive={activeLocks[lock.id as keyof typeof activeLocks]}
+                                        mainClassName="grid grid-cols-6 items-center gap-[12px]"
+                                        className='w-full h-[56px] text-[16px] font-[400]'
+                                    />
                                 ))}
-                                <button className="col-span-2 flex items-center gap-3 p-4 bg-gray-800/50 rounded-lg border-2 border-gray-700 hover:border-gray-600 transition-all group">
-                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-gray-400 group-hover:text-gray-300">
-                                        <path d="M3 12h6m6 0h6M9 12a3 3 0 116 0 3 3 0 01-6 0z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                                    </svg>
-                                    <span className="text-sm font-medium text-gray-300 group-hover:text-white transition-colors">
-                                        Wired Control Lock
-                                    </span>
-                                </button>
+
+                                <div className="col-span-2">
+                                    <TCornerButton
+                                        key={"wired-control-lock"}
+                                        text={"Wired Control Lock"}
+                                        image={"/icons/WDC.svg"}
+                                        bgColor="#2d2c31"
+                                        borderColor={modes.find((m) => m.id === selectedMode)?.bg || '#179BB9'}
+                                        onPress={() => {
+                                            handleLockControls(liveDevice?.deviceSn || '', "wired-control-lock", 0);
+                                        }}
+                                        isActive={activeLocks["wired-control-lock"]}
+                                        mainClassName="w-full grid grid-cols-12 items-center gap-[12px]"
+                                        className='w-full h-[56px] text-[16px] font-[400]'
+                                    />
+                                </div>
                             </div>
                         </div>
                     </>

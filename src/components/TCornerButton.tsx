@@ -18,6 +18,7 @@ interface TCornerButtonProps extends ButtonProps {
   width?: string;
   height?: string;
   isActive?: boolean;
+  mainClassName?: string;
 }
 
 export default function TCornerButton({
@@ -34,6 +35,7 @@ export default function TCornerButton({
   height = "h-9",
   className = "",
   isActive = false,
+  mainClassName = "",
   ...props
 }: TCornerButtonProps) {
   return (
@@ -54,7 +56,7 @@ export default function TCornerButton({
       {...props}
     >
       {/* Content */}
-      <div className="flex flex-col items-center gap-2">
+      <div className={`${mainClassName || "flex flex-col items-center gap-2"}`}>
         {icon && <span className="text-xl">{icon as string}</span>}
         {image && <img src={image} alt="icon" className="w-6 h-6" />}
         {text && <span className={`${textSize || ""} font-semibold`}>{text}</span>}

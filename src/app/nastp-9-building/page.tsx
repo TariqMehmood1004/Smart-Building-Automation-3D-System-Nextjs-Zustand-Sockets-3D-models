@@ -627,6 +627,7 @@ function ModelContent({
       <points ref={particlesRef}>
         <bufferGeometry>
           <bufferAttribute
+            args={[positions, 3]}
             attach="attributes-position"
             count={particleCount}
             array={positions}
@@ -836,7 +837,8 @@ export default function ModelViewer() {
   }, [onClose, drawerOpen, selectedRoomName]);
 
   // url="/models/Delta_9_Exterior-Model.glb"
-  let background_model = "/models/Delta_9_Exterior-Model.glb";
+  // let background_model = "/models/Delta_9_Exterior-Model.glb";
+  let background_model = "/models/Delta_9_Exterior-2.glb";
 
   
   return (
@@ -923,7 +925,7 @@ export default function ModelViewer() {
         <div className={`absolute top-0 right-0 max-w-[620px] w-full h-full p-6 transform transition-all duration-500 ease-out z-[999] ${
           drawerOpen ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'
         }`}>
-          <main className="w-full h-full flex flex-col items-center justify-center orbitron-font">
+          <main className="w-full h-full flex flex-col items-center justify-end orbitron-font">
             <ACControlDrawer
                 data={[liveDrawerDevice!]}
                 onClose={() => {
