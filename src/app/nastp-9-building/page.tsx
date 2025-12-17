@@ -1,7 +1,7 @@
 "use client";
 
 import React, { Suspense, useRef, useLayoutEffect, useMemo, useState, useEffect, useCallback } from "react";
-import { Canvas, useThree } from "@react-three/fiber";
+import { Canvas, useThree, useFrame } from "@react-three/fiber";
 import { Html, OrbitControls, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import { OrbitControls as OrbitControlsImpl } from "three-stdlib";
@@ -21,8 +21,142 @@ import TWeatherForcasting from "@/components/TWeatherForcasting";
 import { activeStatus, getActiveStatus, MideaRunModes } from "@/types/types";
 import TWeatherForcastingWith3DModel from "@/components/TWeatherForcastingWith3DModel";
 
+// Component to handle zoom detection and auto-reset
+function ZoomWatcher({ 
+  controlsRef, 
+  defaultCameraState,
+  onResetToDefault 
+}: { 
+  controlsRef: React.RefObject<OrbitControlsImpl | null>;
+  defaultCameraState: React.MutableRefObject<{ position: THREE.Vector3; target: THREE.Vector3 } | null>;
+  onResetToDefault: () => void;
+}) {
+  const { camera } = useThree();
+  const lastDistanceRef = useRef<number | null>(null);
+  const zoomThreshold = 0.5; // Sensitivity for detecting zoom out
+  
+  useFrame(() => {
+    if (!controlsRef.current || !defaultCameraState.current) return;
+    
+    const currentDistance = camera.position.distanceTo(controlsRef.current.target);
+    
+    // Initialize on first frame
+    if (lastDistanceRef.current === null) {
+      lastDistanceRef.current = currentDistance;
+      return;
+    }
+    
+    // Check if user is zooming out (distance increasing)
+    const distanceDelta = currentDistance - lastDistanceRef.current;
+    
+    // If zooming out beyond threshold, reset to default
+    if (distanceDelta > zoomThreshold) {
+      onResetToDefault();
+    }
+    
+    lastDistanceRef.current = currentDistance;
+  });
+  
+  return null;
+}
 
-function FrameModel({ model }: { model: THREE.Object3D }) {
+function AnimatedHotspot({
+  children,
+  index,
+  activeIndex,
+  hovered,
+}: {
+  children: React.ReactNode;
+  index: number;
+  activeIndex: number | null;
+  hovered: boolean;
+}) {
+  const ref = useRef<THREE.Group>(null);
+  const floatOffset = useMemo(() => Math.random() * Math.PI * 2, []);
+
+  useFrame(({ clock }) => {
+    if (!ref.current) return;
+    const t = clock.getElapsedTime();
+
+    // sine floating
+    ref.current.position.y += Math.sin(t * 1.5 + floatOffset) * 0.002;
+
+    // persistent active scale
+    const targetScale =
+      activeIndex === index ? 1.15 : hovered ? 1.08 : 1;
+
+    ref.current.scale.lerp(
+      new THREE.Vector3(targetScale, targetScale, targetScale),
+      0.1
+    );
+  });
+
+  return <group ref={ref}>{children}</group>;
+}
+
+// Animation helper for smooth camera transitions
+function useCameraAnimation(
+  camera: THREE.Camera,
+  controls: OrbitControlsImpl | null
+) {
+  const animationRef = useRef<{
+    isAnimating: boolean;
+    startPos: THREE.Vector3;
+    endPos: THREE.Vector3;
+    startTarget: THREE.Vector3;
+    endTarget: THREE.Vector3;
+    progress: number;
+  } | null>(null);
+
+  useFrame(() => {
+    if (!animationRef.current?.isAnimating || !controls) return;
+
+    const anim = animationRef.current;
+    anim.progress += 0.05; // Animation speed (0.05 = ~1 second)
+
+    if (anim.progress >= 1) {
+      camera.position.copy(anim.endPos);
+      controls.target.copy(anim.endTarget);
+      controls.update();
+      animationRef.current.isAnimating = false;
+      return;
+    }
+
+    // Smooth easing function (ease-in-out)
+    const eased = anim.progress < 0.5
+      ? 2 * anim.progress * anim.progress
+      : 1 - Math.pow(-2 * anim.progress + 2, 2) / 2;
+
+    camera.position.lerpVectors(anim.startPos, anim.endPos, eased);
+    controls.target.lerpVectors(anim.startTarget, anim.endTarget, eased);
+    controls.update();
+  });
+
+  const animateTo = useCallback((targetPos: THREE.Vector3, targetLookAt: THREE.Vector3) => {
+    if (!controls) return;
+
+    animationRef.current = {
+      isAnimating: true,
+      startPos: camera.position.clone(),
+      endPos: targetPos.clone(),
+      startTarget: controls.target.clone(),
+      endTarget: targetLookAt.clone(),
+      progress: 0,
+    };
+  }, [camera, controls]);
+
+  return animateTo;
+}
+
+function FrameModel({ 
+  model, 
+  defaultCameraState,
+  onStoreDefaultCamera 
+}: { 
+  model: THREE.Object3D;
+  defaultCameraState: React.MutableRefObject<{ position: THREE.Vector3; target: THREE.Vector3 } | null>;
+  onStoreDefaultCamera: (pos: THREE.Vector3, target: THREE.Vector3) => void;
+}) {
   const { camera, controls } = useThree();
 
   const modelRef = useRef<THREE.Object3D>(model);
@@ -41,8 +175,7 @@ function FrameModel({ model }: { model: THREE.Object3D }) {
       const fov = (camera.fov * Math.PI) / 180;
       const distance = (maxDim / 3) / Math.tan(fov / 2) * 1.0;
       
-      // Position camera directly above the model (top-down view)
-      camera.position.set(center.x + 2.5, center.y + distance + 1.2, center.z);
+      camera.position.set(center.x + 2.5, center.y + distance + 1.2, center.z + 0.2);
       camera.lookAt(center.x, center.y, center.z);
       
       camera.near = Math.max(0.5, distance / 100);
@@ -53,15 +186,15 @@ function FrameModel({ model }: { model: THREE.Object3D }) {
     if (controls && "target" in controls && "update" in controls) {
       (controls as OrbitControlsImpl).target.copy(center);
       (controls as OrbitControlsImpl).update();
+      
+      // Store default camera state after setup
+      if (!defaultCameraState.current) {
+        onStoreDefaultCamera(camera.position.clone(), center.clone());
+      }
     }
 
-    // Center the model at origin (0, 0, 0)
     model.position.set(-center.x, -center.y, -center.z);
-    
-    // Keep rotation if needed
-    // model.rotation.y = Math.PI / 1;
-
-  }, [model, camera, controls]);
+  }, [model, camera, controls, defaultCameraState, onStoreDefaultCamera]);
 
   return null;
 }
@@ -69,11 +202,15 @@ function FrameModel({ model }: { model: THREE.Object3D }) {
 function ModelContent({
   url,
   controlsRef,
-  onOpenDrawer
+  onOpenDrawer,
+  defaultCameraState,
+  onStoreDefaultCamera
 }: {
   url: string;
   controlsRef: React.RefObject<OrbitControlsImpl | null>;
   onOpenDrawer: (index: number, childName: string) => void;
+  defaultCameraState: React.MutableRefObject<{ position: THREE.Vector3; target: THREE.Vector3 } | null>;
+  onStoreDefaultCamera: (pos: THREE.Vector3, target: THREE.Vector3) => void;
 }) {
 
   const {
@@ -95,6 +232,9 @@ function ModelContent({
   const [hoveredUuid, setHoveredUuid] = useState<string | null>(null);
 
   const modelRef = useRef<THREE.Object3D>(scene);
+
+  // Add camera animation hook
+  const animateCameraTo = useCameraAnimation(camera, controlsRef.current);
 
   useLayoutEffect(() => {
     modelRef.current = scene;
@@ -143,18 +283,15 @@ function ModelContent({
       if (!controlsRef.current) return;
 
       const targetVec = new THREE.Vector3(...pos);
-      
-      // Get camera's current direction but position at fixed distance from target
       const currentDir = new THREE.Vector3()
           .subVectors(camera.position, controlsRef.current.target)
           .normalize();
       
-      // DISTANCE from target (adjust this value)
-      const zoomDistance = 22.0; // Try 6-12 for good room overview
-      
-      camera.position.copy(targetVec.clone().add(currentDir.multiplyScalar(zoomDistance)));
-      controlsRef.current.target.copy(targetVec);
-      controlsRef.current.update();
+      const zoomDistance = 22.0;
+      const newCameraPos = targetVec.clone().add(currentDir.multiplyScalar(zoomDistance));
+
+      // Use smooth animation instead of instant jump
+      animateCameraTo(newCameraPos, targetVec);
 
       setActiveIndex(index);
       onOpenDrawer(index, name);
@@ -164,24 +301,31 @@ function ModelContent({
       if (!controlsRef.current) return;
 
       const targetVec = new THREE.Vector3(...pos);
-      
-      // Get camera's current direction but position at fixed distance from target
       const currentDir = new THREE.Vector3()
           .subVectors(camera.position, controlsRef.current.target)
           .normalize();
       
-      // DISTANCE from target (adjust this value)
-      const zoomDistance = 22.0; // Try 6-12 for good room overview
-      
-      camera.position.copy(targetVec.clone().add(currentDir.multiplyScalar(zoomDistance)));
-      controlsRef.current.target.copy(targetVec);
-      controlsRef.current.update();
+      const zoomDistance = 22.0;
+      const newCameraPos = targetVec.clone().add(currentDir.multiplyScalar(zoomDistance));
+
+      // Use smooth animation
+      animateCameraTo(newCameraPos, targetVec);
 
       setActiveIndex(index);
   };
 
   // In hotspotMeshes useMemo
+  const [ripples, setRipples] = useState<number[]>([]);
   const hotspotMeshes = useMemo(() => {
+    
+      const spawnRipple = () => {
+        const id = Date.now();
+        setRipples(r => [...r, id]);
+        setTimeout(() => {
+          setRipples(r => r.filter(x => x !== id));
+        }, 2000);
+      };
+
       return childPositions.map((p) => {
         console.log(chalk.green(`Processing hotspot for ${JSON.stringify(p, null, 4)}`));
 
@@ -199,6 +343,17 @@ function ModelContent({
 
           console.log(chalk.blue(`activeStatus for ${p.name}: ${activeStatus}`));
 
+          {ripples.map(id => (
+            <mesh key={id}>
+              <ringGeometry args={[1.2, 1.4, 32]} />
+              <meshBasicMaterial
+                transparent
+                opacity={0.8}
+                color="#00ff96"
+              />
+            </mesh>
+          ))}
+
           return (
               <mesh
                   key={p.uuid}
@@ -207,11 +362,9 @@ function ModelContent({
                   onPointerOut={() => { setHoveredUuid(null); document.body.style.cursor = "default"; }}
                   onClick={(e) => { 
                       e.stopPropagation(); 
-                      handleOnZoomClick(p.pos, p.index);  // Your existing zoom function
+                      handleOnZoomClick(p.pos, p.index);
                   }}
               >
-                  {/* <sphereGeometry args={[0.85, 100, 100]} /> */}
-
                   {/* Rectangle with hover */}
                   <boxGeometry 
                     args={[2.3, 3.6, 1.6]}
@@ -230,20 +383,24 @@ function ModelContent({
                           <Loader className="animate-spin w-6 h-6 text-white" />
                       ) : (
                           <>
-                              <div className="flex gap-2 items-center text-white">
-                                  <span>{assignedName}</span>
+                              <div className="flex gap-2 items-center text-white transition-all duration-300">
+                                  <span className={hoveredUuid === p.uuid ? "scale-105" : ""}>{assignedName}</span>
                               </div>
 
-                              <div className="shadow-lg w-fit bg-black p-2 flex items-center justify-center rounded-full cursor-pointer hover:scale-110 ease-in-out duration-300">
+                              <div className={`shadow-lg w-fit bg-black p-2 flex items-center justify-center rounded-full cursor-pointer transition-all duration-300 ${
+                                hoveredUuid === p.uuid ? "scale-125 shadow-2xl" : "hover:scale-110"
+                              }`}>
                                   <THvacStatusIcon
                                       width={25}
                                       height={25}
-                                      activeStatus={activeStatus}  // Use actual run mode
-                                      className={`!bg-[${runModeBGColor}]`}  // Use dynamic bg color
+                                      activeStatus={activeStatus}
+                                      className={`!bg-[${runModeBGColor}]`}
                                       onClick={() => { handleClick(p.pos, p.index, p.name); }}
                                   />
                               </div>
-                              <span className="flex flex-col items-center bg-black p-1 px-2.5 rounded-[4px] border border-[#FFFFFF29]">
+                              <span className={`flex flex-col items-center bg-black p-1 px-2.5 rounded-[4px] border border-[#FFFFFF29] transition-all duration-300 ${
+                                hoveredUuid === p.uuid ? "scale-105" : ""
+                              }`}>
                                   <p className="text-white text-[14px]">{temperature}° C</p>
                               </span>
                           </>
@@ -254,11 +411,14 @@ function ModelContent({
       });
   }, [childPositions, hoveredUuid, data, isSocketLoading]);
 
-
   return (
     <group>
       <primitive object={scene} />
-      <FrameModel model={scene} />
+      <FrameModel 
+        model={scene} 
+        defaultCameraState={defaultCameraState}
+        onStoreDefaultCamera={onStoreDefaultCamera}
+      />
       {hotspotMeshes}
     </group>
   );
@@ -268,9 +428,15 @@ export default function ModelViewer() {
   const { data } = useMideaStore();
 
   const controlsRef = useRef<OrbitControlsImpl | null>(null);
-  const [selectedRoomName, setSelectedRoomName] = useState<string>(""); // Only track room name
+  const [selectedRoomName, setSelectedRoomName] = useState<string>("");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const { isOpen, onOpen, onClose } = useDisclosure();
+  
+  // Store default camera position and target
+  const defaultCameraState = useRef<{
+    position: THREE.Vector3;
+    target: THREE.Vector3;
+  } | null>(null);
 
   // LIVE DEVICE LOOKUP - always fresh from store
   const getLiveDevice = useCallback((roomName: string): HvacMideaDevice | null => {
@@ -289,6 +455,22 @@ export default function ModelViewer() {
     setDrawerOpen(true);
     onOpen();
   }, [onOpen]);
+
+  // Store default camera position
+  const storeDefaultCamera = useCallback((position: THREE.Vector3, target: THREE.Vector3) => {
+    if (!defaultCameraState.current) {
+      defaultCameraState.current = { position, target };
+    }
+  }, []);
+
+  // Reset to default camera view
+  const resetToDefaultView = useCallback(() => {
+    if (drawerOpen) {
+      setDrawerOpen(false);
+      setSelectedRoomName("");
+      onClose();
+    }
+  }, [drawerOpen, onClose]);
 
   // Auto-close logic
   useEffect(() => {
@@ -341,19 +523,27 @@ export default function ModelViewer() {
           <directionalLight position={[10, 10, 5]} intensity={1} />
           <directionalLight position={[-10, -10, -5]} intensity={0.5} />
           
+          {/* Zoom watcher to detect zoom out */}
+          <ZoomWatcher 
+            controlsRef={controlsRef} 
+            defaultCameraState={defaultCameraState}
+            onResetToDefault={resetToDefaultView}
+          />
+          
           <ModelContent
-              // url="/models/D_9_GF-22.glb"
               url={background_model}
               controlsRef={controlsRef}
               onOpenDrawer={handleOpenDrawer}
+              defaultCameraState={defaultCameraState}
+              onStoreDefaultCamera={storeDefaultCamera}
             />
 
             <ModelContent
-              // url="/models/D_9_GF-22.glb"
               url="/models/D_9_GF-Main.glb"
-              // url={background_model}
               controlsRef={controlsRef}
               onOpenDrawer={handleOpenDrawer}
+              defaultCameraState={defaultCameraState}
+              onStoreDefaultCamera={storeDefaultCamera}
             />
         </Suspense>
 
@@ -362,44 +552,24 @@ export default function ModelViewer() {
           ref={controlsRef}
           enableRotate={false}
           enableZoom={true}
-          maxZoom={10}      // ← Much lower (less zoom in)
-          minZoom={20}      // ← Allow minimal zoom
+          maxZoom={10}
+          minZoom={20}
           enablePan={true}
-          minDistance={22}  // ← Much higher minimum distance
-          maxDistance={100} // ← Higher max distance
+          minDistance={22}
+          maxDistance={100}
           maxPolarAngle={Math.PI / 2.5}
           minPolarAngle={0}
         />
-
-        {/* <OrbitControls
-          ref={controlsRef}
-          enableRotate={false}
-          enableZoom={true}
-          maxZoom={10}
-          minZoom={40}
-          enablePan={true}
-          minDistance={5}
-          maxDistance={70}
-          maxPolarAngle={Math.PI / 2.5}
-          minPolarAngle={0}
-          onChange={() => {
-            if (!controlsRef.current) return;
-
-            // Log camera position
-            // console.log("Camera Position:", controlsRef.current.object.position);
-
-            // Log model position
-            // console.log("Model Position:", modelRef.current?.position);
-          }}
-        /> */}
       </Canvas>
 
-      {/* Simple Drawer */}
+      {/* Drawer with slide animation */}
       {drawerOpen && (
-        <div className="absolute top-0 right-0 max-w-[596px] h-full p-6 transform transition-transform duration-300">
+        <div className={`absolute top-0 right-0 max-w-[596px] h-full p-6 transform transition-all duration-500 ease-out ${
+          drawerOpen ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'
+        }`}>
           <main className="w-full h-full flex flex-col items-center justify-center orbitron-font">
             <ACControlDrawer
-                data={[liveDrawerDevice!]}      // Always LIVE from store
+                data={[liveDrawerDevice!]}
                 onClose={() => {
                   setDrawerOpen(false);
                   setSelectedRoomName("");
