@@ -199,6 +199,231 @@ function FrameModel({
   return null;
 }
 
+// function ModelContent({
+//   url,
+//   controlsRef,
+//   onOpenDrawer,
+//   defaultCameraState,
+//   onStoreDefaultCamera
+// }: {
+//   url: string;
+//   controlsRef: React.RefObject<OrbitControlsImpl | null>;
+//   onOpenDrawer: (index: number, childName: string) => void;
+//   defaultCameraState: React.MutableRefObject<{ position: THREE.Vector3; target: THREE.Vector3 } | null>;
+//   onStoreDefaultCamera: (pos: THREE.Vector3, target: THREE.Vector3) => void;
+// }) {
+
+//   const {
+//     data,
+//     initSocket,
+//     isSocketLoading,
+//   } = useMideaStore();
+
+//   useEffect(() => {
+//     initSocket();    
+//   }, [initSocket]);
+  
+//   // 3D modeling content
+//   const { scene } = useGLTF(url, true);
+
+//   const { camera } = useThree();
+
+//   const [, setActiveIndex] = useState<number | null>(null);
+//   const [hoveredUuid, setHoveredUuid] = useState<string | null>(null);
+
+//   const modelRef = useRef<THREE.Object3D>(scene);
+
+//   // Camera settings
+//   const zoomDistance = 30.0;
+
+//   // Add camera animation hook
+//   const animateCameraTo = useCameraAnimation(camera, controlsRef.current);
+
+//   useLayoutEffect(() => {
+//     modelRef.current = scene;
+//   }, [scene]);
+
+//   const [childPositions, setChildPositions] = useState<
+//     { uuid: string; name: string; pos: [number, number, number]; index: number }[]
+//   >([]);
+
+//   useLayoutEffect(() => {
+//     if (!scene) return;
+//     scene.updateMatrixWorld(true);
+
+//     const topChildren = scene.children.map((c) => c.children).flat().filter(c => c.children.length > 0);
+
+//     const positions = topChildren.map((child, index) => {
+//       child.updateMatrixWorld(true);
+//       let worldVec = new THREE.Vector3();
+//       const mesh = child.getObjectByProperty("type", "Mesh") as THREE.Mesh | undefined;
+
+//       if (mesh) {
+//         mesh.updateWorldMatrix(true, false);
+//         const geom = mesh.geometry as THREE.BufferGeometry;
+//         if (geom) {
+//           if (!geom.boundingBox) geom.computeBoundingBox();
+//           const box = geom.boundingBox!.clone();
+//           const min = box.min.clone().applyMatrix4(mesh.matrixWorld);
+//           const max = box.max.clone().applyMatrix4(mesh.matrixWorld);
+//           worldVec = new THREE.Vector3().addVectors(min, max).multiplyScalar(0.5);
+//         } else mesh.getWorldPosition(worldVec);
+//       } else {
+//         child.getWorldPosition(worldVec);
+//       }
+
+//       return { 
+//         uuid: child.uuid, name: child.name || "", 
+//         pos: [worldVec.x, worldVec.y, worldVec.z] as [number, number, number], 
+//         index 
+//       };
+//     });
+
+//     setChildPositions(positions);
+//   }, [scene]);
+
+//   const handleClick = (pos: [number, number, number], index: number, name: string) => {
+//       if (!controlsRef.current) return;
+
+//       const targetVec = new THREE.Vector3(...pos);
+//       const currentDir = new THREE.Vector3()
+//           .subVectors(camera.position, controlsRef.current.target)
+//           .normalize();
+      
+//       const newCameraPos = targetVec.clone().add(currentDir.multiplyScalar(zoomDistance));
+
+//       // Use smooth animation instead of instant jump
+//       animateCameraTo(newCameraPos, targetVec);
+
+//       setActiveIndex(index);
+//       onOpenDrawer(index, name);
+//   };
+
+//   const handleOnZoomClick = (pos: [number, number, number], index: number) => {
+//       if (!controlsRef.current) return;
+
+//       const targetVec = new THREE.Vector3(...pos);
+//       const currentDir = new THREE.Vector3()
+//           .subVectors(camera.position, controlsRef.current.target)
+//           .normalize();
+      
+//       const newCameraPos = targetVec.clone().add(currentDir.multiplyScalar(zoomDistance));
+
+//       // Use smooth animation
+//       animateCameraTo(newCameraPos, targetVec);
+
+//       setActiveIndex(index);
+//   };
+
+//   // In hotspotMeshes useMemo
+//   const [ripples, setRipples] = useState<number[]>([]);
+//   const hotspotMeshes = useMemo(() => {
+    
+//       const spawnRipple = () => {
+//         const id = Date.now();
+//         setRipples(r => [...r, id]);
+//         setTimeout(() => {
+//           setRipples(r => r.filter(x => x !== id));
+//         }, 2000);
+//       };
+
+//       return childPositions.map((p) => {
+//         console.log(chalk.green(`Processing hotspot for ${JSON.stringify(p, null, 4)}`));
+
+//           const assignedName = data?.metadata.map(d => d.tenantRoom?.assigned_name === p.name ? d.deviceSn : null).filter(Boolean)[0] || `${p.name}: Unknown Room`;
+//           const temperature = data?.metadata.map(d => d.tenantRoom?.assigned_name === p.name ? d.set_temperature : null).filter(Boolean)[0] || 0;
+          
+//           const newData = data?.metadata.map(d => d.tenantRoom?.assigned_name === p.name ? d : null).filter(Boolean)[0] || null;
+          
+//           // Get the actual run mode from newData
+//           const currentRunMode = newData?.run_mode;
+//           const runModeBGColor = MideaRunModes.find(m => m.mode === currentRunMode)?.bg || '#27AE60'; // default to Auto
+          
+//           // Map run_mode number to activeStatus string
+//           const activeStatus = getActiveStatus(currentRunMode as number);
+
+//           console.log(chalk.blue(`activeStatus for ${p.name}: ${activeStatus}`));
+
+//           {ripples.map(id => (
+//             <mesh key={id}>
+//               <ringGeometry args={[1.2, 1.4, 32]} />
+//               <meshBasicMaterial
+//                 transparent
+//                 opacity={0.8}
+//                 color="#00ff96"
+//               />
+//             </mesh>
+//           ))}
+
+//           return (
+//               <mesh
+//                   key={p.uuid}
+//                   position={p.pos as unknown as THREE.Vector3}
+//                   onPointerOver={(e) => { e.stopPropagation(); setHoveredUuid(p.uuid); document.body.style.cursor = "pointer"; }}
+//                   onPointerOut={() => { setHoveredUuid(null); document.body.style.cursor = "default"; }}
+//                   onClick={(e) => { 
+//                       e.stopPropagation(); 
+//                       handleOnZoomClick(p.pos, p.index);
+//                   }}
+//               >
+//                   {/* Rectangle with hover */}
+//                   <boxGeometry 
+//                     args={[2.3, 3.6, 1.6]}
+//                   />
+
+//                   <meshBasicMaterial
+//                     color={hoveredUuid === p.uuid ? "" : "blue"}
+//                     transparent={true}
+//                     opacity={hoveredUuid === p.uuid ? 0 : 0}
+//                     side={THREE.DoubleSide}
+//                 />
+
+//                   <Html position={[0, 0.05, 0]} distanceFactor={4.5} center className="w-[200px] flex font-[600] inter-tight flex-col items-center gap-[6px]">
+
+//                       {isSocketLoading ? (
+//                           <Loader className="animate-spin w-6 h-6 text-white" />
+//                       ) : (
+//                           <>
+//                               <div className="flex gap-2 items-center text-white transition-all duration-300">
+//                                   <span className={hoveredUuid === p.uuid ? "scale-105" : ""}>{assignedName}</span>
+//                               </div>
+
+//                               <div className={`shadow-lg w-fit bg-black p-2 flex items-center justify-center rounded-full cursor-pointer transition-all duration-300 ${
+//                                 hoveredUuid === p.uuid ? "scale-125 shadow-2xl" : "hover:scale-110"
+//                               }`}>
+//                                   <THvacStatusIcon
+//                                       width={25}
+//                                       height={25}
+//                                       activeStatus={activeStatus}
+//                                       className={`!bg-[${runModeBGColor}]`}
+//                                       onClick={() => { handleClick(p.pos, p.index, p.name); }}
+//                                   />
+//                               </div>
+//                               <span className={`flex flex-col items-center bg-black p-1 px-2.5 rounded-[4px] border border-[#FFFFFF29] transition-all duration-300 ${
+//                                 hoveredUuid === p.uuid ? "scale-105" : ""
+//                               }`}>
+//                                   <p className="text-white text-[14px]">{temperature}° C</p>
+//                               </span>
+//                           </>
+//                       )}
+//                   </Html>
+//               </mesh>
+//           );
+//       });
+//   }, [childPositions, hoveredUuid, data, isSocketLoading]);
+
+//   return (
+//     <group>
+//       <primitive object={scene} />
+//       <FrameModel 
+//         model={scene} 
+//         defaultCameraState={defaultCameraState}
+//         onStoreDefaultCamera={onStoreDefaultCamera}
+//       />
+//       {hotspotMeshes}
+//     </group>
+//   );
+// }
 function ModelContent({
   url,
   controlsRef,
@@ -223,17 +448,16 @@ function ModelContent({
     initSocket();    
   }, [initSocket]);
   
-  // 3D modeling content
   const { scene } = useGLTF(url, true);
-
   const { camera } = useThree();
 
   const [, setActiveIndex] = useState<number | null>(null);
   const [hoveredUuid, setHoveredUuid] = useState<string | null>(null);
+  const [clickedUuid, setClickedUuid] = useState<string | null>(null);
 
   const modelRef = useRef<THREE.Object3D>(scene);
+  const zoomDistance = 30.0;
 
-  // Add camera animation hook
   const animateCameraTo = useCameraAnimation(camera, controlsRef.current);
 
   useLayoutEffect(() => {
@@ -287,129 +511,261 @@ function ModelContent({
           .subVectors(camera.position, controlsRef.current.target)
           .normalize();
       
-      const zoomDistance = 22.0;
       const newCameraPos = targetVec.clone().add(currentDir.multiplyScalar(zoomDistance));
 
-      // Use smooth animation instead of instant jump
       animateCameraTo(newCameraPos, targetVec);
 
       setActiveIndex(index);
       onOpenDrawer(index, name);
   };
 
-  const handleOnZoomClick = (pos: [number, number, number], index: number) => {
+  const handleOnZoomClick = (pos: [number, number, number], index: number, uuid: string) => {
       if (!controlsRef.current) return;
+
+      // Trigger click animation
+      setClickedUuid(uuid);
+      setTimeout(() => setClickedUuid(null), 800);
+
+      // Spawn ripples
+      spawnRipple(uuid);
 
       const targetVec = new THREE.Vector3(...pos);
       const currentDir = new THREE.Vector3()
           .subVectors(camera.position, controlsRef.current.target)
           .normalize();
       
-      const zoomDistance = 22.0;
       const newCameraPos = targetVec.clone().add(currentDir.multiplyScalar(zoomDistance));
 
-      // Use smooth animation
       animateCameraTo(newCameraPos, targetVec);
 
       setActiveIndex(index);
   };
 
-  // In hotspotMeshes useMemo
-  const [ripples, setRipples] = useState<number[]>([]);
-  const hotspotMeshes = useMemo(() => {
-    
-      const spawnRipple = () => {
-        const id = Date.now();
-        setRipples(r => [...r, id]);
-        setTimeout(() => {
-          setRipples(r => r.filter(x => x !== id));
-        }, 2000);
-      };
+  // Enhanced ripple system with multiple waves
+  const [ripples, setRipples] = useState<{ id: number; uuid: string }[]>([]);
+  
+  const spawnRipple = (uuid: string) => {
+    const id = Date.now();
+    setRipples(r => [...r, { id, uuid }]);
+    setTimeout(() => {
+      setRipples(r => r.filter(x => x.id !== id));
+    }, 1500);
+  };
 
+  // Animated ripple component
+  const AnimatedRipple = ({ uuid, rippleId }: { uuid: string; rippleId: number }) => {
+    const meshRef = useRef<THREE.Mesh>(null);
+    
+    useFrame((state) => {
+      if (!meshRef.current) return;
+      const elapsed = (Date.now() - rippleId) / 1500;
+      
+      // Expand and fade out
+      const scale = 1 + elapsed * 3;
+      meshRef.current.scale.set(scale, scale, 1);
+      
+      const material = meshRef.current.material as THREE.MeshBasicMaterial;
+      material.opacity = Math.max(0, 1 - elapsed);
+    });
+
+    return (
+      <mesh ref={meshRef}>
+        <ringGeometry args={[1.8, 2.2, 32]} />
+        <meshBasicMaterial
+          transparent
+          opacity={1}
+          color="#00ff96"
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+    );
+  };
+
+  // Particle burst effect
+  const ParticleBurst = ({ uuid }: { uuid: string }) => {
+    const particlesRef = useRef<THREE.Points>(null);
+    const startTime = useRef(Date.now());
+    
+    const particleCount = 20;
+    const positions = useMemo(() => {
+      const arr = new Float32Array(particleCount * 3);
+      for (let i = 0; i < particleCount; i++) {
+        arr[i * 3] = 0;
+        arr[i * 3 + 1] = 0;
+        arr[i * 3 + 2] = 0;
+      }
+      return arr;
+    }, []);
+
+    const velocities = useMemo(() => {
+      return Array.from({ length: particleCount }, () => ({
+        x: (Math.random() - 0.5) * 3,
+        y: (Math.random() - 0.5) * 3,
+        z: (Math.random() - 0.5) * 3,
+      }));
+    }, []);
+
+    useFrame(() => {
+      if (!particlesRef.current) return;
+      const elapsed = (Date.now() - startTime.current) / 800;
+      
+      const positions = particlesRef.current.geometry.attributes.position.array as Float32Array;
+      
+      for (let i = 0; i < particleCount; i++) {
+        positions[i * 3] = velocities[i].x * elapsed;
+        positions[i * 3 + 1] = velocities[i].y * elapsed;
+        positions[i * 3 + 2] = velocities[i].z * elapsed;
+      }
+      
+      particlesRef.current.geometry.attributes.position.needsUpdate = true;
+      
+      const material = particlesRef.current.material as THREE.PointsMaterial;
+      material.opacity = Math.max(0, 1 - elapsed);
+    });
+
+    return (
+      <points ref={particlesRef}>
+        <bufferGeometry>
+          <bufferAttribute
+            attach="attributes-position"
+            count={particleCount}
+            array={positions}
+            itemSize={3}
+            usage={THREE.DynamicDrawUsage}
+            name="position"
+          />
+        </bufferGeometry>
+        <pointsMaterial
+          size={0.3}
+          color="#00ff96"
+          transparent
+          opacity={1}
+          sizeAttenuation
+        />
+      </points>
+    );
+  };
+
+  const hotspotMeshes = useMemo(() => {
       return childPositions.map((p) => {
-        console.log(chalk.green(`Processing hotspot for ${JSON.stringify(p, null, 4)}`));
+          console.log(chalk.green(`Processing hotspot for ${JSON.stringify(p, null, 4)}`));
 
           const assignedName = data?.metadata.map(d => d.tenantRoom?.assigned_name === p.name ? d.deviceSn : null).filter(Boolean)[0] || `${p.name}: Unknown Room`;
           const temperature = data?.metadata.map(d => d.tenantRoom?.assigned_name === p.name ? d.set_temperature : null).filter(Boolean)[0] || 0;
           
           const newData = data?.metadata.map(d => d.tenantRoom?.assigned_name === p.name ? d : null).filter(Boolean)[0] || null;
-          
-          // Get the actual run mode from newData
           const currentRunMode = newData?.run_mode;
-          const runModeBGColor = MideaRunModes.find(m => m.mode === currentRunMode)?.bg || '#27AE60'; // default to Auto
-          
-          // Map run_mode number to activeStatus string
+          const runModeBGColor = MideaRunModes.find(m => m.mode === currentRunMode)?.bg || '#27AE60';
           const activeStatus = getActiveStatus(currentRunMode as number);
 
           console.log(chalk.blue(`activeStatus for ${p.name}: ${activeStatus}`));
 
-          {ripples.map(id => (
-            <mesh key={id}>
-              <ringGeometry args={[1.2, 1.4, 32]} />
-              <meshBasicMaterial
-                transparent
-                opacity={0.8}
-                color="#00ff96"
-              />
-            </mesh>
-          ))}
+          const isHovered = hoveredUuid === p.uuid;
+          const isClicked = clickedUuid === p.uuid;
+          const activeRipples = ripples.filter(r => r.uuid === p.uuid);
 
           return (
-              <mesh
-                  key={p.uuid}
-                  position={p.pos as unknown as THREE.Vector3}
-                  onPointerOver={(e) => { e.stopPropagation(); setHoveredUuid(p.uuid); document.body.style.cursor = "pointer"; }}
-                  onPointerOut={() => { setHoveredUuid(null); document.body.style.cursor = "default"; }}
-                  onClick={(e) => { 
-                      e.stopPropagation(); 
-                      handleOnZoomClick(p.pos, p.index);
-                  }}
-              >
-                  {/* Rectangle with hover */}
-                  <boxGeometry 
-                    args={[2.3, 3.6, 1.6]}
-                  />
+              <group key={p.uuid} position={p.pos as unknown as THREE.Vector3}>
+                  {/* Ripple effects */}
+                  {activeRipples.map(ripple => (
+                    <AnimatedRipple key={ripple.id} uuid={p.uuid} rippleId={ripple.id} />
+                  ))}
 
-                  <meshBasicMaterial
-                    color={hoveredUuid === p.uuid ? "" : "blue"}
-                    transparent={true}
-                    opacity={hoveredUuid === p.uuid ? 0 : 0}
-                    side={THREE.DoubleSide}
-                />
+                  {/* Particle burst on click */}
+                  {isClicked && <ParticleBurst uuid={p.uuid} />}
 
-                  <Html position={[0, 0.05, 0]} distanceFactor={4.5} center className="w-[200px] flex font-[600] inter-tight flex-col items-center gap-[6px]">
+                  {/* Main interactive mesh */}
+                  <mesh
+                      onPointerOver={(e) => { 
+                        e.stopPropagation(); 
+                        setHoveredUuid(p.uuid); 
+                        document.body.style.cursor = "pointer"; 
+                      }}
+                      onPointerOut={() => { 
+                        setHoveredUuid(null); 
+                        document.body.style.cursor = "default"; 
+                      }}
+                      onClick={(e) => { 
+                          e.stopPropagation(); 
+                          handleOnZoomClick(p.pos, p.index, p.uuid);
+                      }}
+                  >
+                      <boxGeometry args={[1.5, 6.6, 2.5]} />
+                      <meshBasicMaterial
+                        color="blue"
+                        transparent={true}
+                        opacity={0}
+                        side={THREE.DoubleSide}
+                      />
+                  </mesh>
 
+                  {/* Glow effect when hovered */}
+                  {isHovered && (
+                    <mesh>
+                      <sphereGeometry args={[2.5, 32, 32]} />
+                      <meshBasicMaterial
+                        color="#00ff96"
+                        transparent
+                        opacity={0.15}
+                        side={THREE.BackSide}
+                      />
+                    </mesh>
+                  )}
+
+                  <Html 
+                    position={[0, 0.05, 0]} 
+                    distanceFactor={4.5} 
+                    center 
+                    className="w-[200px] flex font-[600] inter-tight flex-col items-center gap-[6px]"
+                  >
                       {isSocketLoading ? (
                           <Loader className="animate-spin w-6 h-6 text-white" />
                       ) : (
                           <>
-                              <div className="flex gap-2 items-center text-white transition-all duration-300">
-                                  <span className={hoveredUuid === p.uuid ? "scale-105" : ""}>{assignedName}</span>
+                              <div className={`flex gap-2 items-center text-white transition-all duration-300 ${
+                                isClicked ? 'animate-pulse' : ''
+                              }`}>
+                                  <span className={`transition-all duration-300 ${
+                                    isHovered ? "scale-110 text-black" : ""
+                                  }`}>
+                                    {assignedName}
+                                  </span>
                               </div>
 
-                              <div className={`shadow-lg w-fit bg-black p-2 flex items-center justify-center rounded-full cursor-pointer transition-all duration-300 ${
-                                hoveredUuid === p.uuid ? "scale-125 shadow-2xl" : "hover:scale-110"
-                              }`}>
+                              <div className={`
+                                shadow-lg w-fit bg-black p-2 flex items-center justify-center 
+                                rounded-full cursor-pointer transition-all duration-300
+                                ${isHovered ? "scale-125 shadow-[0_0_30px_rgba(0,255,150,0.5)] ring-2 ring-[#00ff96]" : "hover:scale-110"}
+                                ${isClicked ? "scale-150 rotate-[360deg]" : ""}
+                              `}>
                                   <THvacStatusIcon
                                       width={25}
                                       height={25}
                                       activeStatus={activeStatus}
-                                      className={`!bg-[${runModeBGColor}]`}
+                                      className={`!bg-[${runModeBGColor}] transition-all duration-300`}
                                       onClick={() => { handleClick(p.pos, p.index, p.name); }}
                                   />
                               </div>
-                              <span className={`flex flex-col items-center bg-black p-1 px-2.5 rounded-[4px] border border-[#FFFFFF29] transition-all duration-300 ${
-                                hoveredUuid === p.uuid ? "scale-105" : ""
-                              }`}>
-                                  <p className="text-white text-[14px]">{temperature}° C</p>
+
+                              <span className={`
+                                flex flex-col items-center bg-black p-1 px-2.5 rounded-[4px] 
+                                border border-[#FFFFFF29] transition-all duration-300
+                                ${isHovered ? "scale-110 border-[#00ff96] shadow-[0_0_15px_rgba(0,255,150,0.3)]" : ""}
+                                ${isClicked ? "scale-125" : ""}
+                              `}>
+                                  <p className={`text-white text-[14px] transition-all duration-300 ${
+                                    isHovered ? "text-black" : ""
+                                  }`}>
+                                    {temperature}° C
+                                  </p>
                               </span>
                           </>
                       )}
                   </Html>
-              </mesh>
+              </group>
           );
       });
-  }, [childPositions, hoveredUuid, data, isSocketLoading]);
+  }, [childPositions, hoveredUuid, clickedUuid, data, isSocketLoading, ripples]);
 
   return (
     <group>
@@ -564,7 +920,7 @@ export default function ModelViewer() {
 
       {/* Drawer with slide animation */}
       {drawerOpen && (
-        <div className={`absolute top-0 right-0 max-w-[596px] h-full p-6 transform transition-all duration-500 ease-out ${
+        <div className={`absolute top-0 right-0 max-w-[620px] w-full h-full p-6 transform transition-all duration-500 ease-out z-[999] ${
           drawerOpen ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'
         }`}>
           <main className="w-full h-full flex flex-col items-center justify-center orbitron-font">

@@ -55,7 +55,7 @@
   --track: #4747ff;
   --white: #fff;
   --yellow: #f6d653;
-  --lines: 7;
+  --lines: 25;
 
 
   --radius: 0.625rem;
@@ -331,7 +331,7 @@ input[type=range]::-moz-range-thumb {
 }
 
 .toggle-input:checked + .toggle-track .toggle-thumb {
-  left: calc(100% - 57px);
+  left: calc(100% - 45px);
   background: radial-gradient(
     circle,
     rgba(0, 255, 150, 0.8) 100%,

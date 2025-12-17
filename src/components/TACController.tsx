@@ -196,7 +196,7 @@ const ACControlDrawer = ({
     console.log("Selected Mode BG:", selectedColor);
 
     return (
-        <div className="w-full z-[1000] mx-auto bg-[#16161A] text-white border border-[#0D8FAC] shadow-2xl relative overflow-hidden">
+        <div className="w-full z-[1000] mx-auto bg-[#16161A] text-white border border-[#0D8FAC] shadow-2xl relative overflow-x-hidden">
             
             {/* Cyan corners decoration - unchanged */}
             <div className="w-2.5 h-2.5 bg-[#0D8FAC] absolute top-0 left-1/2 -translate-x-1/2 z-[999]" style={{ clipPath: 'polygon(0% 0%, 100% 0%, 50% 100%)' }}>
@@ -212,7 +212,7 @@ const ACControlDrawer = ({
                 <span className="w-2.5 h-2.5 bg-[#0D8FAC]"></span>
             </div>
 
-            <section className='h-[80vh] overflow-y-scroll custom-scrollbar p-6'>
+            <section className='h-[80vh] overflow-y-scroll overflow-x-hidden custom-scrollbar p-6'>
                 {!isMatchedRoom ? (
                     <div className="w-full h-full flex items-center justify-center text-red-500 text-lg mb-4 text-center font-semibold">
                         <p>Warning: No matching information found</p>
@@ -343,14 +343,14 @@ const ACControlDrawer = ({
                                 />
                             </div>
 
-                            <div className="flex items-center justify-between py-4 mb-6">
+                            <div className="flex items-center relative justify-between py-4 mb-6">
                                 <div className="flex items-center gap-3">
                                     <span className="text-lg font-medium">Swing Throw</span>
                                     <Image src={"/icons/swing-throw.svg"} width={28} height={28} alt="Swing Throw" />
                                 </div>
 
                                 <div className="toggle-container">
-                                    <Button onPress={() => setSwingThrow(prev => !prev)} className="toggle-wrap">
+                                    <div typeof='button' onClick={() => setSwingThrow(prev => !prev)} className="toggle-wrap">
                                         <input
                                             className="toggle-input"
                                             id="holo-toggle"
@@ -377,9 +377,10 @@ const ACControlDrawer = ({
                                             <div className="data-text on">ON</div>
                                         </div>
                                         </label>
-                                    </Button>
+                                    </div>
                                 </div>
                             </div>
+
                             <div 
                                 style={{
                                     borderColor: selectedColor

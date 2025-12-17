@@ -14,7 +14,7 @@ const THeader = () => {
   const router = useRouter();
 
   return (
-    <section className="flex items-center justify-center gap-8 absolute top-0 left-0 right-0 z-[999] w-full h-16 mt-8">
+    <section className="flex items-center justify-center gap-8 absolute top-0 left-0 right-0 z-[998] w-full h-16 mt-8">
       
       {/* Back button if not root ("/") */}
       {pathname !== "/" && (
