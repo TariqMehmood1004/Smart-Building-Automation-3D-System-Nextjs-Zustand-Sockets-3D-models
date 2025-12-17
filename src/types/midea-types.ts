@@ -1,3 +1,5 @@
+import { Lock, RefreshCw, Unlock } from "lucide-react";
+
 // Sub Device Type
 export interface SubDeviceType {
   id: string;
@@ -207,3 +209,24 @@ export interface StoreState {
   isUnlockLoading: boolean;
   unlockAllDevices: () => Promise<void>
 }
+
+export const controllers = [
+  {
+    id: 1,
+    name: "Default Lock",
+    icon: Lock,
+    isCenter: false
+  },
+  {
+    id: 2,
+    name: "Default Reset",
+    icon: RefreshCw,
+    isCenter: true
+  },
+  {
+    id: 3,
+    name: "Default Unlock",
+    icon: Unlock,
+    isCenter: false
+  },
+]

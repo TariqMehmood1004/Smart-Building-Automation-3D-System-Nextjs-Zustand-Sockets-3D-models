@@ -10,13 +10,14 @@ import {
   DrawerContent,
   DrawerBody,
   useDisclosure,
+  Button,
 } from "@heroui/react";
 import THvacStatusIcon from "@/components/Icons/THvacStatusIcon";
 import { useMideaStore } from "@/stores/useMideaStore";
 import { Loader } from "lucide-react";
 import chalk from "chalk";
 import ACControlDrawer from "@/components/TACController";
-import { HvacMideaDevice } from "@/types/midea-types";
+import { controllers, HvacMideaDevice } from "@/types/midea-types";
 import TWeatherForcasting from "@/components/TWeatherForcasting";
 import { activeStatus, getActiveStatus, MideaRunModes } from "@/types/types";
 import TWeatherForcastingWith3DModel from "@/components/TWeatherForcastingWith3DModel";
@@ -60,38 +61,67 @@ function ZoomWatcher({
   return null;
 }
 
-function AnimatedHotspot({
-  children,
-  index,
-  activeIndex,
-  hovered,
+function CameraResetter({
+  controlsRef,
+  defaultCameraState,
+  resetTrigger,
 }: {
-  children: React.ReactNode;
-  index: number;
-  activeIndex: number | null;
-  hovered: boolean;
+  controlsRef: React.RefObject<OrbitControlsImpl | null>;
+  defaultCameraState: React.MutableRefObject<{ position: THREE.Vector3; target: THREE.Vector3 } | null>;
+  resetTrigger: number;
 }) {
-  const ref = useRef<THREE.Group>(null);
-  const floatOffset = useMemo(() => Math.random() * Math.PI * 2, []);
+  const { camera } = useThree();
+  const animationRef = useRef<{
+    isAnimating: boolean;
+    startPos: THREE.Vector3;
+    endPos: THREE.Vector3;
+    startTarget: THREE.Vector3;
+    endTarget: THREE.Vector3;
+    progress: number;
+  } | null>(null);
 
-  useFrame(({ clock }) => {
-    if (!ref.current) return;
-    const t = clock.getElapsedTime();
+  // Reset animation hook (same as useCameraAnimation)
+  useFrame(() => {
+    if (!animationRef.current?.isAnimating || !controlsRef.current) return;
 
-    // sine floating
-    ref.current.position.y += Math.sin(t * 1.5 + floatOffset) * 0.002;
+    const anim = animationRef.current;
+    anim.progress += 0.05; // Same speed as ModelContent (~1 second)
 
-    // persistent active scale
-    const targetScale =
-      activeIndex === index ? 1.15 : hovered ? 1.08 : 1;
+    if (anim.progress >= 1) {
+      camera.position.copy(anim.endPos);
+      controlsRef.current.target.copy(anim.endTarget);
+      controlsRef.current.update();
+      animationRef.current.isAnimating = false;
+      return;
+    }
 
-    ref.current.scale.lerp(
-      new THREE.Vector3(targetScale, targetScale, targetScale),
-      0.1
-    );
+    // Smooth easing function (ease-in-out) - EXACT same as ModelContent
+    const eased = anim.progress < 0.5
+      ? 2 * anim.progress * anim.progress
+      : 1 - Math.pow(-2 * anim.progress + 2, 2) / 2;
+
+    camera.position.lerpVectors(anim.startPos, anim.endPos, eased);
+    controlsRef.current.target.lerpVectors(anim.startTarget, anim.endTarget, eased);
+    controlsRef.current.update();
   });
 
-  return <group ref={ref}>{children}</group>;
+  // Trigger reset animation
+  useEffect(() => {
+    if (!defaultCameraState.current || !controlsRef.current) return;
+
+    const { position, target } = defaultCameraState.current;
+
+    animationRef.current = {
+      isAnimating: true,
+      startPos: camera.position.clone(),
+      endPos: position.clone(),
+      startTarget: controlsRef.current.target.clone(),
+      endTarget: target.clone(),
+      progress: 0,
+    };
+  }, [resetTrigger, camera, controlsRef, defaultCameraState]);
+
+  return null;
 }
 
 // Animation helper for smooth camera transitions
@@ -199,7 +229,6 @@ function FrameModel({
   return null;
 }
 
-
 function ModelContent({
   url,
   controlsRef,
@@ -247,16 +276,6 @@ function ModelContent({
   useLayoutEffect(() => {
     if (!scene) return;
     scene.updateMatrixWorld(true);
-
-    // // Compute bounding box
-    // const box = new THREE.Box3().setFromObject(scene);
-    // const center = box.getCenter(new THREE.Vector3());
-    // scene.position.sub(center);
-
-    // // Shift slightly down on Y-axis
-    // scene.position.y -= 20; // Adjust this value as needed (increase for more downward shift)
-
-    // scene.updateMatrixWorld(true);
 
     const topChildren = scene.children.map((c) => c.children).flat().filter(c => c.children.length > 0);
 
@@ -512,8 +531,8 @@ function ModelContent({
                               <div className={`flex gap-2 items-center text-white transition-all duration-300 ${
                                 isClicked ? 'animate-pulse' : ''
                               }`}>
-                                  <span className={`transition-all duration-300 ${
-                                    isHovered ? "scale-110 text-black" : ""
+                                  <span className={`transition-all duration-300 hidden ${
+                                    isHovered ? "scale-105 text-black" : ""
                                   }`}>
                                     {assignedName}
                                   </span>
@@ -522,8 +541,8 @@ function ModelContent({
                               <div className={`
                                 shadow-lg w-fit bg-black p-2 flex items-center justify-center 
                                 rounded-full cursor-pointer transition-all duration-300
-                                ${isHovered ? "scale-125 shadow-[0_0_30px_rgba(0,255,150,0.5)] ring-2 ring-[#00ff96]" : "hover:scale-110"}
-                                ${isClicked ? "scale-150 rotate-[360deg]" : ""}
+                                ${isHovered ? "shadow-[0_0_30px_rgba(0,255,150,0.5)]" : ""}
+                                ${isClicked ? "scale-110" : ""}
                               `}>
                                   <THvacStatusIcon
                                       width={25}
@@ -537,8 +556,8 @@ function ModelContent({
                               <span className={`
                                 flex flex-col items-center bg-black p-1 px-2.5 rounded-[4px] 
                                 border border-[#FFFFFF29] transition-all duration-300
-                                ${isHovered ? "scale-110 border-[#00ff96] shadow-[0_0_15px_rgba(0,255,150,0.3)]" : ""}
-                                ${isClicked ? "scale-125" : ""}
+                                ${isHovered ? "border-[#00ff96] shadow-[0_0_15px_rgba(0,255,150,0.3)]" : ""}
+                                ${isClicked ? "" : ""}
                               `}>
                                   <p className={`text-white text-[14px] transition-all duration-300 ${
                                     isHovered ? "text-black" : ""
@@ -574,6 +593,8 @@ export default function ModelViewer() {
   const [selectedRoomName, setSelectedRoomName] = useState<string>("");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const { isOpen, onOpen, onClose } = useDisclosure();
+  const [resetTrigger, setResetTrigger] = useState(0);
+  const [isResetting, setIsResetting] = useState(false);
   
   // Store default camera position and target
   const defaultCameraState = useRef<{
@@ -626,6 +647,22 @@ export default function ModelViewer() {
   // let background_model = "/models/Delta_9_Exterior-Model.glb";
   let background_model = "/models/Delta_9_Exterior-2.glb";
 
+  const handleResetModelView = useCallback(() => {
+    setIsResetting(true);
+
+    // close drawer etc.
+    if (drawerOpen) {
+      setDrawerOpen(false);
+      setSelectedRoomName("");
+      onClose();
+    }
+
+    // bump trigger so CameraResetter runs
+    setResetTrigger((v) => v + 1);
+
+    // Stop spinning after animation
+    setTimeout(() => setIsResetting(false), 1000);
+  }, [drawerOpen, onClose]);
   
   return (
     <div className="w-screen h-screen flex items-center justify-center">
@@ -673,6 +710,12 @@ export default function ModelViewer() {
             defaultCameraState={defaultCameraState}
             onResetToDefault={resetToDefaultView}
           />
+
+          <CameraResetter
+            controlsRef={controlsRef}
+            defaultCameraState={defaultCameraState}
+            resetTrigger={resetTrigger}
+          />
           
           <ModelContent
               url={background_model}
@@ -703,8 +746,40 @@ export default function ModelViewer() {
           maxDistance={100}
           maxPolarAngle={Math.PI / 2.5}
           minPolarAngle={0}
+          makeDefault
         />
       </Canvas>
+
+      {/* Controls in the center bottom of the screen */}
+      <section className="bg-[#16161AEB] absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center justify-center gap-4 z-[999] px-4 py-2.5 rounded-full">
+        {controllers
+          .map((item) => {
+            const IconComponent = item.icon;
+            return (
+              <Button 
+                key={item.id} 
+                onPress={() => {
+                  if (item.isCenter) {
+                    handleResetModelView();
+                  }
+                }} 
+                className={
+                `
+                h-12 rounded-full transition-all duration-300 flex gap-2 items-center justify-center text-white
+                ${item.isCenter ? 'bg-[#2D3430] w-12 rounded-full scale-100 flex items-center justify-center cursor-pointer z-[999] grayscale hover:grayscale-0 hover:scale-105' : ''}
+                `
+              }>
+                <IconComponent 
+                  className={`
+                    w-5 h-5 transition-all duration-300 text-white
+                    ${item.isCenter && isResetting ? 'animate-spin text-[#00ff96]' : ''}
+                  `}
+                />
+                {!item.isCenter && <span className="text-[#484848] font-normal">{item.name}</span>}
+              </Button>
+            );
+          })}
+      </section>
 
       {/* Drawer with slide animation */}
       {drawerOpen && (
