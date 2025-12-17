@@ -473,12 +473,12 @@ function ModelContent({
           return (
               <group key={p.uuid} position={p.pos as unknown as THREE.Vector3}>
                   {/* Ripple effects */}
-                  {activeRipples.map(ripple => (
+                  {/* {activeRipples.map(ripple => (
                     <AnimatedRipple key={ripple.id} uuid={p.uuid} rippleId={ripple.id} />
-                  ))}
+                  ))} */}
 
                   {/* Particle burst on click */}
-                  {isClicked && <ParticleBurst uuid={p.uuid} />}
+                  {/* {isClicked && <ParticleBurst uuid={p.uuid} />} */}
 
                   {/* Main interactive mesh */}
                   <mesh
@@ -510,7 +510,7 @@ function ModelContent({
                     <mesh>
                       <sphereGeometry args={[2.5, 32, 32]} />
                       <meshBasicMaterial
-                        color=""
+                        color="red"
                         transparent
                         opacity={0}
                         side={THREE.BackSide}
