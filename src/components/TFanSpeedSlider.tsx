@@ -62,7 +62,7 @@ export default function TFanSpeedSlider({ modes, fanSpeed, onFanSpeedChange }:
                         )`,
                         height: "20px",
                         background: activeBg,
-                        transition: "all 180ms linear"
+                        transition: "all 180ms linear",
                     }}
                 />
 

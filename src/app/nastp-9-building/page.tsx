@@ -5,22 +5,18 @@ import { Canvas, useThree, useFrame } from "@react-three/fiber";
 import { Html, OrbitControls, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import { OrbitControls as OrbitControlsImpl } from "three-stdlib";
-import {
-  Drawer,
-  DrawerContent,
-  DrawerBody,
-  useDisclosure,
-  Button,
-} from "@heroui/react";
+import { useDisclosure, Button, } from "@heroui/react";
 import THvacStatusIcon from "@/components/Icons/THvacStatusIcon";
 import { useMideaStore } from "@/stores/useMideaStore";
 import { Loader } from "lucide-react";
 import chalk from "chalk";
 import ACControlDrawer from "@/components/TACController";
-import { controllers, HvacMideaDevice } from "@/types/midea-types";
+import { ChildPositionsIn3DModel, controllers, HvacMideaDevice } from "@/types/midea-types";
 import TWeatherForcasting from "@/components/TWeatherForcasting";
-import { activeStatus, getActiveStatus, MideaRunModes } from "@/types/types";
-import TWeatherForcastingWith3DModel from "@/components/TWeatherForcastingWith3DModel";
+import { getActiveStatus, MideaRunModes } from "@/types/types";
+
+
+const roomAssignedCode = Math.floor(Math.random() * 10000);
 
 // Component to handle zoom detection and auto-reset
 function ZoomWatcher({ 
@@ -269,9 +265,7 @@ function ModelContent({
     modelRef.current = scene;
   }, [scene]);
 
-  const [childPositions, setChildPositions] = useState<
-    { uuid: string; name: string; pos: [number, number, number]; index: number }[]
-  >([]);
+  const [childPositions, setChildPositions] = useState<ChildPositionsIn3DModel[]>([]);
 
   useLayoutEffect(() => {
     if (!scene) return;
@@ -357,101 +351,6 @@ function ModelContent({
     }, 1500);
   };
 
-  // Animated ripple component
-  const AnimatedRipple = ({ uuid, rippleId }: { uuid: string; rippleId: number }) => {
-    const meshRef = useRef<THREE.Mesh>(null);
-    
-    useFrame((state) => {
-      if (!meshRef.current) return;
-      const elapsed = (Date.now() - rippleId) / 1500;
-      
-      // Expand and fade out
-      const scale = 1 + elapsed * 3;
-      meshRef.current.scale.set(scale, scale, 1);
-      
-      const material = meshRef.current.material as THREE.MeshBasicMaterial;
-      material.opacity = Math.max(0, 1 - elapsed);
-    });
-
-    return (
-      <mesh ref={meshRef}>
-        <ringGeometry args={[1.8, 2.2, 32]} />
-        <meshBasicMaterial
-          transparent
-          opacity={1}
-          color="#00ff96"
-          side={THREE.DoubleSide}
-        />
-      </mesh>
-    );
-  };
-
-  // Particle burst effect
-  const ParticleBurst = ({ uuid }: { uuid: string }) => {
-    const particlesRef = useRef<THREE.Points>(null);
-    const startTime = useRef(Date.now());
-    
-    const particleCount = 20;
-    const positions = useMemo(() => {
-      const arr = new Float32Array(particleCount * 3);
-      for (let i = 0; i < particleCount; i++) {
-        arr[i * 3] = 0;
-        arr[i * 3 + 1] = 0;
-        arr[i * 3 + 2] = 0;
-      }
-      return arr;
-    }, []);
-
-    const velocities = useMemo(() => {
-      return Array.from({ length: particleCount }, () => ({
-        x: (Math.random() - 0.5) * 3,
-        y: (Math.random() - 0.5) * 3,
-        z: (Math.random() - 0.5) * 3,
-      }));
-    }, []);
-
-    useFrame(() => {
-      if (!particlesRef.current) return;
-      const elapsed = (Date.now() - startTime.current) / 800;
-      
-      const positions = particlesRef.current.geometry.attributes.position.array as Float32Array;
-      
-      for (let i = 0; i < particleCount; i++) {
-        positions[i * 3] = velocities[i].x * elapsed;
-        positions[i * 3 + 1] = velocities[i].y * elapsed;
-        positions[i * 3 + 2] = velocities[i].z * elapsed;
-      }
-      
-      particlesRef.current.geometry.attributes.position.needsUpdate = true;
-      
-      const material = particlesRef.current.material as THREE.PointsMaterial;
-      material.opacity = Math.max(0, 1 - elapsed);
-    });
-
-    return (
-      <points ref={particlesRef}>
-        <bufferGeometry>
-          <bufferAttribute
-            args={[positions, 3]}
-            attach="attributes-position"
-            count={particleCount}
-            array={positions}
-            itemSize={3}
-            usage={THREE.DynamicDrawUsage}
-            name="position"
-          />
-        </bufferGeometry>
-        <pointsMaterial
-          size={0.3}
-          color="#00ff96"
-          transparent
-          opacity={1}
-          sizeAttenuation
-        />
-      </points>
-    );
-  };
-
   const hotspotMeshes = useMemo(() => {
       return childPositions.map((p) => {
           console.log(chalk.green(`Processing hotspot for ${JSON.stringify(p, null, 4)}`));
@@ -468,18 +367,9 @@ function ModelContent({
 
           const isHovered = hoveredUuid === p.uuid;
           const isClicked = clickedUuid === p.uuid;
-          const activeRipples = ripples.filter(r => r.uuid === p.uuid);
-
           return (
               <group key={p.uuid} position={p.pos as unknown as THREE.Vector3}>
-                  {/* Ripple effects */}
-                  {/* {activeRipples.map(ripple => (
-                    <AnimatedRipple key={ripple.id} uuid={p.uuid} rippleId={ripple.id} />
-                  ))} */}
-
-                  {/* Particle burst on click */}
-                  {/* {isClicked && <ParticleBurst uuid={p.uuid} />} */}
-
+                  
                   {/* Main interactive mesh */}
                   <mesh
                       onPointerOver={(e) => { 
@@ -505,29 +395,23 @@ function ModelContent({
                       />
                   </mesh>
 
-                  {/* Glow effect when hovered */}
-                  {isHovered && (
-                    <mesh>
-                      <sphereGeometry args={[2.5, 32, 32]} />
-                      <meshBasicMaterial
-                        color="red"
-                        transparent
-                        opacity={0}
-                        side={THREE.BackSide}
-                      />
-                    </mesh>
-                  )}
-
                   <Html 
                     position={[0, 0.05, 0]} 
                     distanceFactor={4.5} 
                     center 
+                    portal={{ current: document.getElementById("canvas-html-root") as HTMLElement }}
                     className="w-[200px] flex font-[600] inter-tight flex-col items-center gap-[6px]"
                   >
                       {isSocketLoading ? (
                           <Loader className="animate-spin w-6 h-6 text-white" />
                       ) : (
                           <>
+
+                           {/* Top-right room label */}
+                            <div className="absolute -top-20 -right-[9rem] bg-white p-[3px] rounded-tl-full rounded-bl-full">
+                              <span className="text-[13px] font-semibold text-black rounded-tl-full rounded-bl-full border border-tl-full px-3.5 py-1 border-bl-full border-black">R{roomAssignedCode}</span>
+                            </div>
+
                               <div className={`flex gap-2 items-center text-white transition-all duration-300 ${
                                 isClicked ? 'animate-pulse' : ''
                               }`}>
@@ -665,13 +549,13 @@ export default function ModelViewer() {
   }, [drawerOpen, onClose]);
   
   return (
-    <div className="w-screen h-screen flex items-center justify-center">
+    <div className="relative w-screen h-screen flex items-center justify-center">
       
       <TWeatherForcasting />
 
       <Canvas 
         camera={{ fov: 5, near: 1.5, far: 2000 }}
-        className="w-full h-full"
+        className="w-full h-full relative z-10"
         style={{
           width: '100%',
           height: '100%',

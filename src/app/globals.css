@@ -197,7 +197,8 @@ input[type=range] {
 /* Track: full width, no margins */
 input[type=range]::-webkit-slider-runnable-track {
   -webkit-appearance: none;
-  height: 10px;
+  height: 12px;
+  /* background: white; */
   /* border-radius: 999px; */
   background: repeating-linear-gradient(
     to left,
@@ -219,7 +220,7 @@ input[type=range]::-webkit-slider-thumb {
   background: #FFFF00;
   box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
   position: relative;
-  margin-top: calc(-45px / 2 + 1.1rem);
+  margin-top: calc(-45px / 2 + 1.15rem);
 }
 
 /* Firefox */
@@ -227,6 +228,7 @@ input[type=range]::-moz-range-track {
   height: 8px;
   /* border-radius: 999px; */
   background: transparent;
+  /* background: whitesmoke; */
 }
 input[type=range]::-moz-range-thumb {
   width: 45px;
@@ -237,6 +239,17 @@ input[type=range]::-moz-range-thumb {
   cursor: pointer;
 }
 
+
+/* Example */
+#canvas-html-root {
+  position: absolute;
+  inset: 0;
+  z-index: 5;       /* behind drawer, ahead/behind canvas as needed */
+}
+
+.drawer {
+  z-index: 20;
+}
 
 /* SWITCH TOGGLE BUTTON CSS */
 /* From Uiverse.io by reglobby */ 

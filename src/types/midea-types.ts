@@ -230,3 +230,12 @@ export const controllers = [
     isCenter: false
   },
 ]
+
+export interface ChildPositionsIn3DModel { 
+  uuid: string; 
+  name: string; 
+  pos: [number, number, number]; 
+  index: number 
+}
+
+export interface ClickEventPropsIn3DModel { pos: [number, number, number], index: number, name: string }
