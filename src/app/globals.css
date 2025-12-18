@@ -251,6 +251,53 @@ input[type=range]::-moz-range-thumb {
   z-index: 20;
 }
 
+/* Add to your global CSS */
+.radial-backdrop {
+  background: 
+    radial-gradient(
+      circle at 50% 50%,
+      rgba(22, 22, 26, 0.95) 0%,
+      rgba(22, 22, 26, 0.85) 20%,
+      rgba(22, 22, 26, 0.7) 40%,
+      rgba(22, 22, 26, 0.4) 60%,
+      rgba(22, 22, 26, 0.2) 80%,
+      transparent 100%
+    ),
+    rgba(22, 22, 26, 0.92);
+  backdrop-filter: blur(8px);
+}
+
+/* globals.css */
+.outer-blur-radial {
+  background: 
+    radial-gradient(
+      circle at 50% 50%,
+      transparent 0%,
+      transparent 30%,
+      rgba(22, 22, 26, 0) 50%,
+      rgba(22, 22, 26, 0) 70%,
+      rgba(22, 22, 26, 0.8) 90%,
+      rgba(22, 22, 26, 0.95) 100%
+    );
+  backdrop-filter: blur(12px);
+}
+
+.radial-mask {
+  mask-image: radial-gradient(
+    circle at center,
+    transparent 0%,
+    transparent 25%,
+    black 65%
+  );
+
+  -webkit-mask-image: radial-gradient(
+    circle at center,
+    transparent 0%,
+    transparent 25%,
+    black 65%
+  );
+}
+
 /* SWITCH TOGGLE BUTTON CSS */
 /* From Uiverse.io by reglobby */ 
 .toggle-container {

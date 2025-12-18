@@ -22,17 +22,17 @@ const cities = [
     floors: [
       {
         label: "Ground Floor",
-        value: "delta-4-ground-floor",
+        value: "ground-floor",
         paragraph: "You can view all the data of lobby 1 / Ground floor.",
       },
       {
         label: "First Floor",
-        value: "delta-4-first-floor",
+        value: "first-floor",
         paragraph: "You can view all the data of lobby 2 / First floor.",
       },
       {
         label: "Second Floor",
-        value: "delta-4-second-floor",
+        value: "second-floor",
         paragraph: "You can view all the data of lobby 3 / Second floor.",
       },
     ],
@@ -51,8 +51,24 @@ const cities = [
     value: "delta-9",
     image: "/images/delta/delta-9.png",
     paragraph: "Click to view all the details of delta 9.",
-    floors: [],
-    url: "/nastp-building",
+    floors: [
+      {
+        label: "Ground Floor",
+        value: "ground-floor",
+        paragraph: "You can view all the data of lobby 1 / Ground floor.",
+      },
+      {
+        label: "First Floor",
+        value: "first-floor",
+        paragraph: "You can view all the data of lobby 2 / First floor.",
+      },
+      {
+        label: "Second Floor",
+        value: "second-floor",
+        paragraph: "You can view all the data of lobby 3 / Second floor.",
+      },
+    ],
+    url: "/delta-9",
   },
   {
     label: "Delta 10",
@@ -164,7 +180,11 @@ export default function TDropdownBuildings() {
                 {city.floors.map((floor) => (
                   <div
                     key={floor.value}
-                    onClick={() => handleFloorClick(city.value, floor.value)}
+                    onClick={() => {
+                      console.log("Delta clicked:", city.value);
+                      console.log("Floor clicked:", floor.value);
+                      handleFloorClick(city.value, floor.value);
+                    }}
                     className="hover:bg-[#272727]/60 rounded-lg py-2 px-2 cursor-pointer transition-all duration-200"
                   >
                     <span className="font-semibold">{floor.label}</span>

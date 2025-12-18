@@ -44,7 +44,6 @@ const ACControlDrawer = ({
 
     // Local states for UX (don't conflict with live data)
     const [selectedMode, setSelectedMode] = useState('auto');
-    const [selectedLock, setSelectedLock] = useState('');
     const [swingThrow, setSwingThrow] = useState(true);
     const [fanSpeed, setFanSpeed] = useState(device?.fan_speed || 0);
     const [isMinTempLockOn, setIsMinTempLockOn] = useState(false);
@@ -301,7 +300,7 @@ const ACControlDrawer = ({
                 ) : (
                     <>
                         <div className="flex items-center justify-between">
-                            <Button variant="ghost" onPress={onClose} className="text-gray-400 w-12 focus:outline-none h-12 text-lg text-center hover:text-white transition-colors cursor-pointer rounded-full">
+                            <Button onPress={onClose} className="text-gray-400 w-12 focus:outline-none h-12 text-lg text-center hover:text-white transition-colors cursor-pointer rounded-full">
                                 <Image src="/icons/CloseIcon.svg" alt="Close" width={24} height={24} />
                             </Button>
                             <TCornerButton

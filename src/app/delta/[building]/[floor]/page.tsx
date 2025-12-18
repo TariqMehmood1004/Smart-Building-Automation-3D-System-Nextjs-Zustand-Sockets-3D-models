@@ -12,6 +12,7 @@ import { useEffect } from "react";
 
 export default function FloorPage() {
   const params = useParams<{ building: string; floor: string }>();
+  
   const {
     indoorDevices,
     getHvacData,

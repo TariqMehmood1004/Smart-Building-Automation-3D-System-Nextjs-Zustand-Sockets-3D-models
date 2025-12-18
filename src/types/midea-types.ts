@@ -215,19 +215,22 @@ export const controllers = [
     id: 1,
     name: "Default Lock",
     icon: Lock,
-    isCenter: false
+    isCenter: false,
+    isBlocked: true,
   },
   {
     id: 2,
     name: "Default Reset",
     icon: RefreshCw,
-    isCenter: true
+    isCenter: true,
+    isBlocked: false,
   },
   {
     id: 3,
     name: "Default Unlock",
     icon: Unlock,
-    isCenter: false
+    isCenter: false,
+    isBlocked: true,
   },
 ]
 
@@ -239,3 +242,4 @@ export interface ChildPositionsIn3DModel {
 }
 
 export interface ClickEventPropsIn3DModel { pos: [number, number, number], index: number, name: string }
+
