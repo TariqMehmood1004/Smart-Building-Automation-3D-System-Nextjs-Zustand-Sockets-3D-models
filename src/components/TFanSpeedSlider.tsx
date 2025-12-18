@@ -70,7 +70,9 @@ export default function TFanSpeedSlider({ modes, fanSpeed, onFanSpeedChange }:
                 {Array.from({ length: steps }, (_, i) => (
                     <span
                         key={`step-${i}`}
-                        className="h-full w-[6px] absolute top-[23%] transform translate-y-1/2"
+                        id={`step-${i}`}
+                        onClick={() => setValue(i)}
+                        className="cursor-pointer h-full w-[6px] absolute top-[23%] transform translate-y-1/2"
                         style={{
                             left: `${i * (100 / max)}%`,
                             height: "19.5px",        // Larger height for steps

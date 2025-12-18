@@ -276,7 +276,8 @@ const ACControlDrawer = ({
     }, []);
 
     return (
-        <div className="w-full z-[1000] mx-auto bg-[#16161A] text-white border border-[#0D8FAC] shadow-2xl relative overflow-x-hidden">
+        // <div className="w-full z-[1000] mx-auto bg-[#16161A] text-white border border-[#0D8FAC] shadow-2xl relative overflow-x-hidden">
+        <div className="w-full max-w-[480px] md:max-w-[768px] lg:max-w-[1024px] xl:max-w-[1280px] z-[1000] mx-auto bg-[#16161A] text-white border border-[#0D8FAC] shadow-2xl relative overflow-x-hidden">
             
             {/* Cyan corners decoration - unchanged */}
             <div className="w-2.5 h-2.5 bg-[#0D8FAC] absolute top-0 left-1/2 -translate-x-1/2 z-[999]" style={{ clipPath: 'polygon(0% 0%, 100% 0%, 50% 100%)' }}>
@@ -292,7 +293,8 @@ const ACControlDrawer = ({
                 <span className="w-2.5 h-2.5 bg-[#0D8FAC]"></span>
             </div>
 
-            <section className='h-[85vh] overflow-y-scroll overflow-x-hidden custom-scrollbar p-6'>
+            {/* <section className='h-[85vh] overflow-y-scroll overflow-x-hidden custom-scrollbar p-6'> */}
+            <section className="h-[85vh] sm:h-[80vh] md:h-[75vh] overflow-y-auto overflow-x-hidden custom-scrollbar p-4 sm:p-6">
                 {!isMatchedRoom ? (
                     <div className="w-full h-full flex items-center justify-center text-red-500 text-lg mb-4 text-center font-semibold">
                         <p>Warning: No matching information found</p>
@@ -362,8 +364,9 @@ const ACControlDrawer = ({
                                             decimals={0}
                                             className={`
                                                 bg-transparent pointer-events-none shadow-none outline-none
-                                                border-none focus:outline-none focus:ring-0 p-0 w-[115px]
-                                                text-center text-[48px] font-[600] tracking-tight
+                                                border-none focus:outline-none focus:ring-0 p-0
+                                                w-[80px] sm:w-[100px] md:w-[115px] text-[36px] sm:text-[42px] md:text-[48px] font-[600]
+                                                text-center tracking-tight
                                             `}
                                         />
                                     </div>
@@ -490,9 +493,13 @@ const ACControlDrawer = ({
                                         borderColor={modes.find((m) => m.id === selectedMode)?.bg || '#179BB9'}
                                         onPress={() => {
                                             handleLockControls(liveDevice?.deviceSn || '', lock.id, lock.mode);
+
+                                            const updatedActiveLocks = { ...activeLocks };
+                                            updatedActiveLocks[lock.id as keyof typeof activeLocks] = !activeLocks[lock.id as keyof typeof activeLocks];
+                                            setActiveLocks(updatedActiveLocks);
                                         }}
                                         isActive={activeLocks[lock.id as keyof typeof activeLocks]}
-                                        mainClassName="grid grid-cols-6 items-center gap-[12px]"
+                                        mainClassName="flex items-center w-full items-center gap-[12px]"
                                         className='w-full h-[56px] text-[16px] font-[400]'
                                     />
                                 ))}
@@ -508,7 +515,7 @@ const ACControlDrawer = ({
                                             handleLockControls(liveDevice?.deviceSn || '', "wired-control-lock", 0);
                                         }}
                                         isActive={activeLocks["wired-control-lock"]}
-                                        mainClassName="w-full grid grid-cols-12 items-center gap-[12px]"
+                                        mainClassName="flex items-center w-full items-center gap-[12px]"
                                         className='w-full h-[56px] text-[16px] font-[400]'
                                     />
                                 </div>

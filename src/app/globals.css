@@ -286,15 +286,15 @@ input[type=range]::-moz-range-thumb {
   mask-image: radial-gradient(
     circle at center,
     transparent 0%,
-    transparent 25%,
-    black 65%
+    transparent 45%,
+    black 55%
   );
 
   -webkit-mask-image: radial-gradient(
     circle at center,
     transparent 0%,
-    transparent 25%,
-    black 65%
+    transparent 45%,
+    black 55%
   );
 }
 

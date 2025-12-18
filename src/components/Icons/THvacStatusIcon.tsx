@@ -18,7 +18,7 @@ interface Props {
     height?: number;
     className?: string;
     activeStatus?: activeStatus;
-    onClick?: () => void;
+    onClick?: React.MouseEventHandler<SVGSVGElement>;
 }
 
 const THvacStatusIcon = ({ width, height, className, onClick, activeStatus }: Props) => {

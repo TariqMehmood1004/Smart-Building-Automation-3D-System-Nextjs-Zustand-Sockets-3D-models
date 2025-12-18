@@ -10,42 +10,10 @@ import {
 } from "@heroui/react";
 import { BadgeCheck, ChevronDown } from "lucide-react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 
 const cities = [
-  {
-    label: "Delta 4",
-    value: "delta-4",
-    image: "/images/delta/delta-11.png",
-    paragraph: "Click to view all the details of delta 4.",
-    floors: [
-      {
-        label: "Ground Floor",
-        value: "ground-floor",
-        paragraph: "You can view all the data of lobby 1 / Ground floor.",
-      },
-      {
-        label: "First Floor",
-        value: "first-floor",
-        paragraph: "You can view all the data of lobby 2 / First floor.",
-      },
-      {
-        label: "Second Floor",
-        value: "second-floor",
-        paragraph: "You can view all the data of lobby 3 / Second floor.",
-      },
-    ],
-    url: "/nastp-building",
-  },
-  {
-    label: "Delta 8",
-    value: "delta-8",
-    image: "/images/delta/delta-8.png",
-    paragraph: "Click to view all the details of delta 8.",
-    floors: [],
-    url: "/nastp-building",
-  },
   {
     label: "Delta 9",
     value: "delta-9",
@@ -62,37 +30,8 @@ const cities = [
         value: "first-floor",
         paragraph: "You can view all the data of lobby 2 / First floor.",
       },
-      {
-        label: "Second Floor",
-        value: "second-floor",
-        paragraph: "You can view all the data of lobby 3 / Second floor.",
-      },
     ],
     url: "/delta-9",
-  },
-  {
-    label: "Delta 10",
-    value: "delta-10",
-    image: "/images/delta/delta-10.png",
-    paragraph: "Click to view all the details of delta 10.",
-    floors: [],
-    url: "/nastp-building",
-  },
-  {
-    label: "Delta 11",
-    value: "delta-11",
-    image: "/images/delta/delta-11.png",
-    paragraph: "Click to view all the details of delta 11.",
-    floors: [],
-    url: "/nastp-building",
-  },
-  {
-    label: "Parking Plaza",
-    value: "parking-plaza",
-    image: "/images/delta/parking-plaza.png",
-    paragraph: "Click to view all the details of parking plaza.",
-    floors: [],
-    url: "/nastp-building",
   },
 ];
 
@@ -101,6 +40,7 @@ export default function TDropdownBuildings() {
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(
     new Set([cities[0].value])
   );
+  const pathname = usePathname(); // Get current URL
   const [hoveredCity, setHoveredCity] = useState<string | null>(null);
   const router = useRouter();
 
@@ -109,8 +49,8 @@ export default function TDropdownBuildings() {
     [selectedKeys]
   );
 
-  const handleFloorClick = (cityValue: string, floorValue: string) => {
-    router.push(`/delta/${cityValue}/${floorValue}`);
+  const handleFloorClick = (floorValue: string) => {
+    router.push(`/delta-9/${floorValue}`);
   };
 
   return (
@@ -126,6 +66,7 @@ export default function TDropdownBuildings() {
       </DropdownTrigger>
 
       <DropdownMenu
+        hideSelectedIcon
         disallowEmptySelection
         aria-label="Select building"
         selectedKeys={selectedKeys}
@@ -143,8 +84,8 @@ export default function TDropdownBuildings() {
             onMouseLeave={() => setHoveredCity(null)}
             selectedIcon={null} // hides the check icon
             onClick={() => {
-              router.push(city.url);
               setSelectedKeys(new Set([city.value]));
+              router.push(city.url);
             }}
             className="hover:bg-[#272727]/60 rounded-lg py-2 px-2 cursor-pointer transition-all duration-300 border border-transparent hover:border-[#373737]/80 group relative"
           >
@@ -167,7 +108,9 @@ export default function TDropdownBuildings() {
               <div className="w-9 h-9 rounded-full flex items-center justify-center gap-2 border border-[#373737] group-hover:border-[#373737] transition-all duration-300">
                 <BadgeCheck
                   size={32}
-                  className="hidden duration-300 text-[#A1A5A3] transition-all group-hover:block"
+                  className={`duration-300 text-[#A1A5A3] transition-all ${
+                    pathname.startsWith(city.url) ? "block" : "hidden"
+                  }`}
                 />
               </div>
             </div>
@@ -180,15 +123,27 @@ export default function TDropdownBuildings() {
                 {city.floors.map((floor) => (
                   <div
                     key={floor.value}
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation(); // prevent DropdownItem click
+
                       console.log("Delta clicked:", city.value);
                       console.log("Floor clicked:", floor.value);
-                      handleFloorClick(city.value, floor.value);
+                      
+                      handleFloorClick(floor.value);
                     }}
-                    className="hover:bg-[#272727]/60 rounded-lg py-2 px-2 cursor-pointer transition-all duration-200"
+                    className="hover:bg-[#272727]/60 flex items-center gap-3 rounded-lg py-2 px-2 cursor-pointer transition-all duration-200"
                   >
-                    <span className="font-semibold">{floor.label}</span>
-                    <p className="text-[12px]">{floor.paragraph}</p>
+                    <div>
+                      <span className="font-semibold">{floor.label}</span>
+                      <p className="text-[12px]">{floor.paragraph}</p>
+                    </div>
+                    
+                    <BadgeCheck
+                      size={24}
+                      className={`text-[#A1A5A3] ${
+                        pathname === `${city.url}/${floor.value}` ? "block" : "hidden"
+                      }`}
+                    />
                   </div>
                 ))}
               </div>

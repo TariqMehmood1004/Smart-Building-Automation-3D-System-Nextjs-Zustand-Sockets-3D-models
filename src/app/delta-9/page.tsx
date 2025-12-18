@@ -14,9 +14,7 @@ import ACControlDrawer from "@/components/TACController";
 import { ChildPositionsIn3DModel, controllers, HvacMideaDevice } from "@/types/midea-types";
 import TWeatherForcasting from "@/components/TWeatherForcasting";
 import { getActiveStatus, MideaRunModes } from "@/types/types";
-
-
-// const roomAssignedCode = Math.floor(Math.random() * 10000);
+import { useParams } from "next/navigation";
 
 // Component to handle zoom detection and auto-reset
 function ZoomWatcher({ 
@@ -226,6 +224,7 @@ function FrameModel({
       }
     }
 
+    // model.position.set(-center.x, -center.y, -center.z);
     model.position.set(-center.x, -center.y, -center.z);
   }, [model, camera, controls, defaultCameraState, onStoreDefaultCamera]);
 
@@ -309,25 +308,26 @@ function ModelContent({
     setChildPositions(positions);
   }, [scene]);
 
+  // Onclick on icon button
   const handleClick = (pos: [number, number, number], index: number, name: string) => {
       if (!controlsRef.current) return;
 
       const targetVec = new THREE.Vector3(...pos);
 
-      // const currentDir = new THREE.Vector3()
-      //     .subVectors(camera.position, controlsRef.current.target)
-      //     .normalize();
+      const currentDir = new THREE.Vector3()
+          .subVectors(camera.position, controlsRef.current.target)
+          .normalize();
       
-      // const newCameraPos = targetVec.clone().add(currentDir.multiplyScalar(zoomDistance));
+      const newCameraPos = targetVec.clone().add(currentDir.multiplyScalar(zoomDistance));
 
-      const distance = camera.position.distanceTo(targetVec);
+      // const distance = camera.position.distanceTo(targetVec);
 
       // center.x + 2.5, center.y + distance + 1.2, center.z + 0.2
-      const newCameraPos = new THREE.Vector3(
-        targetVec.x + 2.5,
-        camera.position.y,
-        camera.position.z
-      );
+      // new THREE.Vector3(
+      //   targetVec.x + 2.5,
+      //   camera.position.y,
+      //   camera.position.z
+      // );
 
       animateCameraTo(newCameraPos, targetVec);
 
@@ -427,7 +427,7 @@ function ModelContent({
                           <>
 
                            {/* Top-right room label */}
-                            <div className="absolute -top-20 -right-[8rem] bg-white p-[3px] rounded-tl-full rounded-bl-full">
+                            <div className="absolute -top-20 -right-[9rem] bg-white p-[3px] rounded-tl-full rounded-bl-full">
                               <span className="text-[13px] font-semibold text-black rounded-tl-full rounded-bl-full border border-tl-full px-3.5 py-1 border-bl-full border-black">{roomAssignedCode ? `R${roomAssignedCode}` : `Room not assigned`}</span>
                             </div>
 
@@ -448,11 +448,14 @@ function ModelContent({
                                 ${isClicked ? "scale-110" : ""}
                               `}>
                                   <THvacStatusIcon
-                                      width={25}
-                                      height={25}
-                                      activeStatus={activeStatus}
-                                      className={`!bg-[${runModeBGColor}] transition-all duration-300`}
-                                      onClick={() => { handleClick(p.pos, p.index, p.name); }}
+                                    width={25}
+                                    height={25}
+                                    activeStatus={activeStatus}
+                                    className={`!bg-[${runModeBGColor}] transition-all duration-300`}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleClick(p.pos, p.index, p.name);
+                                    }}
                                   />
                               </div>
 
@@ -491,6 +494,8 @@ function ModelContent({
 
 export default function ModelViewer() {
   const { data } = useMideaStore();
+
+  const params = useParams<{ floor: string }>();
 
   const controlsRef = useRef<OrbitControlsImpl | null>(null);
   const [selectedRoomName, setSelectedRoomName] = useState<string>("");
@@ -638,7 +643,7 @@ export default function ModelViewer() {
         </Suspense>
 
         {/* disable orbit controls */}
-        <OrbitControls
+        {/* <OrbitControls
           ref={controlsRef}
           enableRotate={true}
           enableZoom={true}
@@ -650,13 +655,41 @@ export default function ModelViewer() {
           maxPolarAngle={Math.PI / 2.5}
           minPolarAngle={0}
           makeDefault
+        /> */}
+
+
+        <OrbitControls
+          ref={controlsRef}
+          enableRotate={true}
+          enableZoom={true}
+          maxZoom={10}
+          minZoom={20}
+          enablePan={true}
+          minDistance={10}
+          maxDistance={100}
+
+          /* Horizontal rotation (left–right) */
+          rotateSpeed={0.2}
+
+          /* Vertical rotation (up–down) */
+          minPolarAngle={Math.PI / 8}
+          maxPolarAngle={Math.PI / 4}
+
+          /* Vertical rotation (up–down) */
+          zoomSpeed={0.2}
+          minAzimuthAngle={Math.PI / 4}
+          maxAzimuthAngle={ Math.PI / 1.5}
+
+          makeDefault
         />
       </Canvas>
 
-      {/* Inner transparent, outer blurred show when drawer open */}
-      {/* <section
-        className={`${drawerOpen ? 'hidden' : 'absolute inset-0 w-screen h-screen outer-blur-radial z-[997] transition-all duration-300'}`}
-      ></section> */}
+      {/* LAYOUT: Inner transparent, outer blurred show when drawer open */}
+      {drawerOpen && (
+        <section className="absolute inset-0 z-[997] pointer-events-none">
+          <div className="w-full h-full backdrop-blur-md radial-mask" />
+        </section>
+      )}
 
       {/* Controls in the center bottom of the screen */}
       <section className="bg-[#16161AEB] absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center justify-center gap-4 z-[999] px-4 py-2.5 rounded-full">
@@ -700,9 +733,16 @@ export default function ModelViewer() {
             <ACControlDrawer
                 data={[liveDrawerDevice!]}
                 onClose={() => {
-                  setDrawerOpen(false);
-                  setSelectedRoomName("");
-                  onClose();
+                  // Reset to default view
+                  setTimeout(() => {
+                    resetToDefaultView();
+                    handleResetModelView();
+
+                    setDrawerOpen(false);
+                    setSelectedRoomName("");
+
+                    onClose();
+                  }, 300);
                 }}
                 isMatchedRoom={true}
               />

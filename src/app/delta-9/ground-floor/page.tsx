@@ -308,25 +308,26 @@ function ModelContent({
     setChildPositions(positions);
   }, [scene]);
 
+  // Onclick on icon button
   const handleClick = (pos: [number, number, number], index: number, name: string) => {
       if (!controlsRef.current) return;
 
       const targetVec = new THREE.Vector3(...pos);
 
-      // const currentDir = new THREE.Vector3()
-      //     .subVectors(camera.position, controlsRef.current.target)
-      //     .normalize();
+      const currentDir = new THREE.Vector3()
+          .subVectors(camera.position, controlsRef.current.target)
+          .normalize();
       
-      // const newCameraPos = targetVec.clone().add(currentDir.multiplyScalar(zoomDistance));
+      const newCameraPos = targetVec.clone().add(currentDir.multiplyScalar(zoomDistance));
 
-      const distance = camera.position.distanceTo(targetVec);
+      // const distance = camera.position.distanceTo(targetVec);
 
       // center.x + 2.5, center.y + distance + 1.2, center.z + 0.2
-      const newCameraPos = new THREE.Vector3(
-        targetVec.x + 2.5,
-        camera.position.y,
-        camera.position.z
-      );
+      // new THREE.Vector3(
+      //   targetVec.x + 2.5,
+      //   camera.position.y,
+      //   camera.position.z
+      // );
 
       animateCameraTo(newCameraPos, targetVec);
 
@@ -426,7 +427,7 @@ function ModelContent({
                           <>
 
                            {/* Top-right room label */}
-                            <div className="absolute -top-20 -right-[8rem] bg-white p-[3px] rounded-tl-full rounded-bl-full">
+                            <div className="absolute -top-20 -right-[9rem] bg-white p-[3px] rounded-tl-full rounded-bl-full">
                               <span className="text-[13px] font-semibold text-black rounded-tl-full rounded-bl-full border border-tl-full px-3.5 py-1 border-bl-full border-black">{roomAssignedCode ? `R${roomAssignedCode}` : `Room not assigned`}</span>
                             </div>
 
@@ -447,11 +448,14 @@ function ModelContent({
                                 ${isClicked ? "scale-110" : ""}
                               `}>
                                   <THvacStatusIcon
-                                      width={25}
-                                      height={25}
-                                      activeStatus={activeStatus}
-                                      className={`!bg-[${runModeBGColor}] transition-all duration-300`}
-                                      onClick={() => { handleClick(p.pos, p.index, p.name); }}
+                                    width={25}
+                                    height={25}
+                                    activeStatus={activeStatus}
+                                    className={`!bg-[${runModeBGColor}] transition-all duration-300`}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleClick(p.pos, p.index, p.name);
+                                    }}
                                   />
                               </div>
 
